@@ -32,6 +32,7 @@ class Controller : public QObject {
     Q_PROPERTY(int pending READ pending NOTIFY documentChanged)
     Q_PROPERTY(int failed READ failed NOTIFY documentChanged)
     Q_PROPERTY(bool recording READ recording NOTIFY stateChanged)
+    Q_PROPERTY(bool stopping READ stopping NOTIFY stateChanged)
     Q_PROPERTY(bool paused READ paused NOTIFY stateChanged)
     Q_PROPERTY(bool connected READ connected NOTIFY stateChanged)
     Q_PROPERTY(bool saving READ saving NOTIFY stateChanged)
@@ -66,6 +67,7 @@ public:
     int pending() const { return m_document.value("pending").toInt(); }
     int failed() const { return m_document.value("errors").toInt(); }
     bool recording() const { return !m_active.isEmpty(); }
+    bool stopping() const { return m_stopping; }
     bool paused() const { return m_paused; }
     bool connected() const { return m_connected; }
     bool saving() const { return !m_edits.isEmpty(); }
@@ -133,5 +135,6 @@ private:
     QTimer m_editTimer;
     QString m_selected, m_active, m_engine = "loading", m_engineError, m_error, m_deleted, m_deletionPending, m_selectionPending;
     bool m_paused = false, m_connected = false, m_closing = false;
+    bool m_stopping = false, m_restarting = false;
     double m_seconds = 0, m_level = 0, m_db = -90;
 };

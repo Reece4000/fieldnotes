@@ -28,12 +28,19 @@ Controller::Controller(QObject *parent) : QObject(parent), m_process(new QProces
         m_log.flush();
     });
     connect(m_process, &QProcess::errorOccurred, this, [this](QProcess::ProcessError) {
-        if (!m_closing) setError("The recording service could not start. Check the Python runtime in Resources/runtime.json.");
+        if (!m_closing && !m_restarting) setError("The recording service could not start. Check the Python runtime in Resources/runtime.json.");
     });
     connect(m_process, qOverload<int, QProcess::ExitStatus>(&QProcess::finished), this, [this](int, QProcess::ExitStatus) {
         m_connected = false;
         m_active.clear();
+        m_stopping = false;
         emit stateChanged();
+        if (m_restarting && !m_closing) {
+            m_restarting = false;
+            m_buffer.clear();
+            start();
+            return;
+        }
         if (!m_closing) setError("The recording service stopped. Reopen Fieldnotes to recover saved audio and notes.");
     });
 }
@@ -56,6 +63,7 @@ void Controller::start() {
         QFile::remove(log + ".old");
         QFile::rename(log, log + ".old");
     }
+    m_log.close();
     m_log.setFileName(log);
     if (!m_log.open(QIODevice::WriteOnly | QIODevice::Append)) {
         setError("The notes folder is not writable. Free disk space or check folder permissions, then reopen Fieldnotes.");
@@ -116,6 +124,8 @@ void Controller::handle(const QJsonObject &event) {
             emit documentChanged();
         }
         m_active = event.value("active").toString();
+        if (m_active.isEmpty()) m_stopping = false;
+        else if (event.value("stopping").toBool()) m_stopping = true;
         m_capture = event.value("capture").toObject().toVariantMap();
         m_paused = event.value("paused").toBool();
         m_engine = event.value("engine").toString();
@@ -131,7 +141,16 @@ void Controller::handle(const QJsonObject &event) {
         }
         emit notesChanged();
         emit stateChanged();
-        if (first) refreshDevices();
+        if (first) {
+            if (!m_selected.isEmpty() && documentId != m_selected) selectNote(m_selected);
+            flushEdits();
+            refreshDevices();
+        }
+    } else if (type == "restart") {
+        setError(event.value("message").toString());
+        m_pendingUpdates = m_edits;
+        m_restarting = true;
+        m_process->kill();
     } else if (type == "saved") {
         const auto id = event.value("id").toString();
         if (m_edits.contains(id)) {
@@ -212,7 +231,12 @@ void Controller::doRecord(int device, const QString &collection, const QString &
     if (device >= 0) command.insert("device", device);
     send(command);
 }
-void Controller::stop() { send({{"action", "stop"}}); }
+void Controller::stop() {
+    if (!recording() || m_stopping) return;
+    m_stopping = true;
+    emit stateChanged();
+    send({{"action", "stop"}});
+}
 void Controller::pause() { send({{"action", "pause"}}); }
 void Controller::updateField(const QString &key, const QString &value) {
     if (m_selected.isEmpty() || m_document.value(key).toString() == value) return;

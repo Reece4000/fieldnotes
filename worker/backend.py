@@ -65,6 +65,9 @@ class Backend:
         self.engine_error = ""
         self.current = None
         self.selected = ""
+        self.restarting = False
+        self.shutting_down = False
+        self.capture_state = (None, False)
         self.query = {"workspace": "inbox", "collection": None, "search": "", "trash": False, "limit": 100}
         self.recorder = Recorder(self.store, self.emit, self.wake)
         if emit is None:
@@ -112,6 +115,7 @@ class Backend:
             self._state()
 
     def _state(self):
+        self.capture_state = (self.recorder.note_id, self.recorder.stopping)
         notes, total = self.store.browse(**self.query)
         if not self.selected and notes:
             self.selected = notes[0]["id"]
@@ -121,7 +125,7 @@ class Backend:
                    "document": self.store.document(self.selected), "total": total,
                    "workspaces": workspaces, "categories": categories,
                    "capture": {key: capture.get(key) for key in ("workspace", "collection")} if capture else {},
-                   "paused": self.recorder.paused, "engine": self.engine_status,
+                   "paused": self.recorder.paused, "stopping": self.recorder.stopping, "engine": self.engine_status,
                    "engineError": self.engine_error})
 
     def read_engine(self, timeout):
@@ -232,7 +236,7 @@ class Backend:
         elif action == "pause" and self.recorder.note_id:
             self.recorder.pause()
         elif action == "stop":
-            self.recorder.stop()
+            self.recorder.request_stop()
         elif action == "update":
             fields = {key: command[key] for key in ("title", "collection", "body", "workspace") if key in command}
             if "body" in fields and not self.store.can_edit(note_id):
@@ -268,11 +272,46 @@ class Backend:
             self.retry_engine.set()
             self.wake.set()
         elif action == "shutdown":
-            self.recorder.stop()
+            self.shutting_down = True
+            self.recorder.request_stop()
+            if not self.recorder.note_id:
+                self.quit.set()
+                self.retry_engine.set()
+                self.wake.set()
+        self.state()
+
+    def check_capture(self):
+        before = self.capture_state
+        self.recorder.check()
+        if before != (self.recorder.note_id, self.recorder.stopping):
+            self.state()
+        if self.shutting_down and not self.recorder.note_id:
             self.quit.set()
             self.retry_engine.set()
             self.wake.set()
-        self.state()
+        # Restart only after the journal has drained. A native close deadlock
+        # must not orphan a service or keep the microphone UI running forever.
+        recorder = self.recorder
+        if (recorder.stopping and recorder.journal_sealed
+                and time.monotonic() - recorder.stop_started > 8
+                and (not recorder.thread or not recorder.thread.is_alive()) and not self.restarting):
+            self.restarting = True
+            self.quit.set()
+            self.retry_engine.set()
+            self.wake.set()
+            engine = self.engine
+            if engine:
+                engine.kill()
+                engine.wait(timeout=5)
+            # Flush this final control event before asking Qt to replace us.
+            event = {"event": "restart", "message": "The microphone did not close. Audio saved; restarting the recording service."}
+            if self.emit_override:
+                self.emit(event)
+            else:
+                # write_output exits on quit; send the final line synchronously.
+                if self.output_thread:
+                    self.output_thread.join(timeout=2)
+                print(json.dumps(event), flush=True)
 
     def shutdown(self):
         self.recorder.stop()
@@ -326,14 +365,16 @@ def main():
             try:
                 command = commands.get(timeout=0.5)
                 backend.command(command)
+                backend.check_capture()
             except queue.Empty:
-                active = backend.recorder.note_id
-                backend.recorder.check()
-                if active != backend.recorder.note_id:
-                    backend.state()
+                backend.check_capture()
             except Exception as exc:
                 backend.emit({"event": "error", "message": str(exc)})
     finally:
+        if backend.restarting:
+            # Native audio's interpreter-exit hook can share the same deadlock.
+            # The journal is sealed and the inference child stopped above.
+            os._exit(0)
         backend.shutdown()
     return 0
 

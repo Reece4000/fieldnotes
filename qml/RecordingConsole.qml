@@ -16,6 +16,7 @@ Surface {
     readonly property bool detailed: width > 760
     readonly property bool referenceLayout: detailed && !compact
     readonly property string microphoneName: devicePicker.displayText
+    readonly property bool capturing: controller.recording && !controller.stopping
     // Reference: 3878 × 1074, measured in a proportional 2048 × 567 space.
     readonly property real sx: width / 2048
     readonly property real sy: height / 567
@@ -54,14 +55,14 @@ Surface {
             TapeReel {
                 width: recorderConsole.referenceLayout ? 58 * recorderConsole.unit : 28
                 height: width
-                recording: recorderConsole.controller.recording
+                recording: recorderConsole.capturing
                 paused: recorderConsole.controller.paused
                 reduceMotion: recorderConsole.reduceMotion
                 motionActive: recorderConsole.motionActive
             }
             Text {
                 anchors.verticalCenter: parent.verticalCenter
-                text: recorderConsole.controller.recording ? recorderConsole.controller.paused ? "Input paused" : Math.round(recorderConsole.controller.decibels) + " dBFS" : "Not recording"
+                text: recorderConsole.controller.stopping ? "Input stopped" : recorderConsole.capturing ? recorderConsole.controller.paused ? "Input paused" : Math.round(recorderConsole.controller.decibels) + " dBFS" : "Not recording"
                 color: "#6a7c70"
                 font.pixelSize: recorderConsole.referenceLayout ? 26 * recorderConsole.unit : 12
             }
@@ -79,7 +80,7 @@ Surface {
                     width: (inputColumn.width - 23 * levelMeter.spacing) / 24
                     height: levelMeter.height
                     radius: width / 2
-                    color: recorderConsole.controller.recording && !recorderConsole.controller.paused && index < recorderConsole.controller.level * 24 ? (index > 21 ? "#bc543e" : "#39955f") : "#dfe7dc"
+                    color: recorderConsole.capturing && !recorderConsole.controller.paused && index < recorderConsole.controller.level * 24 ? (index > 21 ? "#bc543e" : "#39955f") : "#dfe7dc"
                 }
             }
             Accessible.role: Accessible.Indicator
@@ -121,7 +122,7 @@ Surface {
                     color: recorderConsole.controller.recording ? recorderConsole.controller.paused ? "#a28139" : "#ce583e" : recorderConsole.controller.connected ? "#39955f" : "#a28139"
                 }
                 Text {
-                    text: recorderConsole.controller.recording ? recorderConsole.controller.paused ? "Paused" : "Recording" : recorderConsole.controller.connected ? "Ready to record" : "Connecting…"
+                    text: recorderConsole.controller.stopping ? "Stopping…" : recorderConsole.capturing ? recorderConsole.controller.paused ? "Paused" : "Recording" : recorderConsole.controller.connected ? "Ready to record" : "Connecting…"
                     color: "#365c45"; font.pixelSize: recorderConsole.referenceLayout ? 26 * recorderConsole.unit : 12; font.weight: Font.Medium
                 }
             }
@@ -138,7 +139,7 @@ Surface {
             height: recorderConsole.referenceLayout ? 160 * recorderConsole.sy : 66
             y: recordButton.y + (recordButton.height - height) / 2
             samples: recorderConsole.controller.waveform
-            capturing: recorderConsole.controller.recording; paused: recorderConsole.controller.paused
+            capturing: recorderConsole.capturing; paused: recorderConsole.controller.paused
         }
         RectangularShadow { anchors.fill: recordButton; radius: recordButton.width / 2; blur: 12; color: "#29c55238"; offset.y: 3 }
         Button {
@@ -147,8 +148,8 @@ Surface {
             height: width
             anchors.horizontalCenter: parent.horizontalCenter
             y: recorderConsole.referenceLayout ? 333 * recorderConsole.sy - height / 2 : recorderConsole.compact ? 92 : 123
-            enabled: recorderConsole.controller.connected; hoverEnabled: true
-            Accessible.name: recorderConsole.controller.recording ? "Stop recording" : "Start recording"
+            enabled: recorderConsole.controller.connected && !recorderConsole.controller.stopping; hoverEnabled: true
+            Accessible.name: recorderConsole.controller.stopping ? "Stopping recording" : recorderConsole.capturing ? "Stop recording" : "Start recording"
             onClicked: recorderConsole.recordRequested()
             background: Rectangle {
                 radius: width / 2
@@ -157,8 +158,8 @@ Surface {
             }
             contentItem: Item {
                 Rectangle {
-                    width: recorderConsole.controller.recording ? recordButton.width * .256 : recordButton.width * .349
-                    height: width; radius: recorderConsole.controller.recording ? 4 : width / 2
+                    width: recorderConsole.capturing ? recordButton.width * .256 : recordButton.width * .349
+                    height: width; radius: recorderConsole.capturing ? 4 : width / 2
                     color: "#fffaf5"; anchors.centerIn: parent
                 }
             }
@@ -182,6 +183,7 @@ Surface {
             y: recorderConsole.referenceLayout ? 455 * recorderConsole.sy : recorderConsole.compact ? 156 : 220
             anchors.horizontalCenter: parent.horizontalCenter
             text: recorderConsole.controller.paused ? "Resume" : "Pause"; quiet: true; implicitHeight: 28
+            enabled: !recorderConsole.controller.stopping
             onClicked: recorderConsole.pauseRequested()
         }
     }

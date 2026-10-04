@@ -3,6 +3,7 @@ import json
 import os
 import sys
 import time
+from pathlib import Path
 
 notes = {
     key: {"id": key, "title": key, "body": "Original " + key,
@@ -11,6 +12,8 @@ notes = {
     for key in ("first", "second")
 }
 selected = "first"
+restart_marker = Path(os.environ["FIELDNOTES_TEST_COMMANDS"]).with_suffix(".restarted")
+active = "first" if os.environ.get("FIELDNOTES_TEST_RECORDING") and not restart_marker.exists() else ""
 
 
 def emit(event):
@@ -20,7 +23,7 @@ def emit(event):
 def state():
     emit({"event": "state", "document": notes[selected],
           "notes": [note for note in notes.values() if not note["deleted"]], "workspaces": [], "categories": [],
-          "total": 2, "active": "", "capture": {}, "engine": "ready"})
+          "total": 2, "active": active, "capture": {}, "engine": "ready"})
 
 
 state()
@@ -44,3 +47,13 @@ for line in sys.stdin:
         state()
     elif command["action"] == "shutdown":
         break
+    elif command["action"] == "stop":
+        emit({"event": "state", "document": notes[selected], "notes": list(notes.values()), "active": active})
+        time.sleep(float(os.environ.get("FIELDNOTES_TEST_STOP_DELAY", ".3")))
+        if os.environ.get("FIELDNOTES_TEST_RESTART"):
+            restart_marker.touch()
+            emit({"event": "restart", "message": "The microphone did not close. Audio saved; restarting the recording service."})
+            time.sleep(5)
+            break
+        active = ""
+        state()

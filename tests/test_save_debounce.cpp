@@ -30,6 +30,8 @@ private slots:
         qputenv("FIELDNOTES_DATA_DIR", data->path().toUtf8());
         qputenv("FIELDNOTES_TEST_COMMANDS", data->filePath("commands.jsonl").toUtf8());
         qunsetenv("FIELDNOTES_TEST_ACK_DELAY");
+        qunsetenv("FIELDNOTES_TEST_RECORDING");
+        qunsetenv("FIELDNOTES_TEST_RESTART");
         controller = std::make_unique<Controller>();
         controller->start();
         QTRY_VERIFY_WITH_TIMEOUT(controller->connected(), 5000);
@@ -41,6 +43,8 @@ private slots:
         qunsetenv("FIELDNOTES_DATA_DIR");
         qunsetenv("FIELDNOTES_TEST_COMMANDS");
         qunsetenv("FIELDNOTES_TEST_ACK_DELAY");
+        qunsetenv("FIELDNOTES_TEST_RECORDING");
+        qunsetenv("FIELDNOTES_TEST_RESTART");
     }
     void batchesLatestTitleAndBodyAfterQuietPeriod() {
         controller->updateBody("First keystrokes");
@@ -128,6 +132,36 @@ private slots:
         controller->trashNote("first");
         QTRY_COMPARE_WITH_TIMEOUT(controller->selectedId(), QString("second"), 2000);
         QCOMPARE(controller->body(), QString("Original second"));
+    }
+    void stopImmediatelyFreezesFeedbackAndIgnoresOlderCaptureState() {
+        controller.reset();
+        qputenv("FIELDNOTES_TEST_RECORDING", "1");
+        controller = std::make_unique<Controller>(); controller->start();
+        QTRY_VERIFY_WITH_TIMEOUT(controller->recording(), 5000);
+        controller->stop();
+        QVERIFY(controller->stopping());
+        QTest::qWait(150);
+        QVERIFY(controller->stopping());
+        controller->stop();
+        QTRY_VERIFY_WITH_TIMEOUT(!controller->recording(), 2000);
+        QVERIFY(!controller->stopping());
+        QCOMPARE(commands("stop").size(), 1);
+    }
+    void stalledMicrophoneServiceRestartsAndPreservesSelectionAndQueuedEdits() {
+        controller.reset();
+        qputenv("FIELDNOTES_TEST_RECORDING", "1");
+        qputenv("FIELDNOTES_TEST_RESTART", "1");
+        controller = std::make_unique<Controller>(); controller->start();
+        QTRY_VERIFY_WITH_TIMEOUT(controller->recording(), 5000);
+        controller->selectNote("second");
+        QTRY_COMPARE_WITH_TIMEOUT(controller->selectedId(), QString("second"), 2000);
+        controller->updateBody("Queued text survives microphone recovery");
+        controller->stop();
+        QTRY_VERIFY_WITH_TIMEOUT(controller->connected() && !controller->recording(), 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(!controller->saving(), 3000);
+        QCOMPARE(controller->selectedId(), QString("second"));
+        QCOMPARE(controller->body(), QString("Queued text survives microphone recovery"));
+        QVERIFY(!controller->stopping());
     }
 };
 QTEST_GUILESS_MAIN(SaveDebounceTest)

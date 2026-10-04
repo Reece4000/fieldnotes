@@ -18,6 +18,13 @@ class Recorder:
         self.guard = None
         self.fault = ""
         self.last_frame = time.monotonic()
+        self.stopping = False
+        self.stop_thread = None
+        self.stop_started = 0
+        self.stop_error = ""
+        self.stop_error_reported = False
+        self.journal_sealed = False
+        self.capture_lock = threading.Lock()
 
     def devices(self):
         import sounddevice as sd
@@ -29,6 +36,10 @@ class Recorder:
             raise RuntimeError("A recording is already running")
         self.note_id = note_id
         self.paused = False
+        self.stopping = False
+        self.stop_error = ""
+        self.stop_error_reported = False
+        self.journal_sealed = False
         self.fault = ""
         self.frames = queue.Queue(maxsize=120)
         self.last_frame = time.monotonic()
@@ -61,12 +72,13 @@ class Recorder:
         self.last_frame = time.monotonic()
         if status:
             self.fault = f"The microphone reported {status}. Recording stopped; captured audio is recoverable."
-        if self.paused or self.fault:
-            return
-        try:
-            self.frames.put_nowait(bytes(data))
-        except queue.Full:
-            self.fault = "Audio could not be saved fast enough. Recording stopped; saved chunks are recoverable."
+        with self.capture_lock:
+            if self.paused or self.stopping or self.fault:
+                return
+            try:
+                self.frames.put_nowait(bytes(data))
+            except queue.Full:
+                self.fault = "Audio could not be saved fast enough. Recording stopped; saved chunks are recoverable."
 
     def write_loop(self):
         import numpy as np
@@ -83,6 +95,7 @@ class Recorder:
                 if pcm is None:
                     if segment_id:
                         self.store.close_segment(segment_id)
+                    self.journal_sealed = True
                     self.wake.set()
                     return
                 if pcm == "boundary":
@@ -127,37 +140,72 @@ class Recorder:
             self.wake.set()
 
     def pause(self):
+        if self.stopping:
+            return
         self.paused = not self.paused
         if self.paused:
             self.frames.put("boundary")
         self.store.update(self.note_id, status="paused" if self.paused else "recording")
 
+    def request_stop(self, interrupted=False):
+        if not self.note_id or self.stopping:
+            return
+        with self.capture_lock:
+            self.stopping = True
+        self.stop_started = time.monotonic()
+        def finish():
+            try:
+                self.stop(interrupted)
+            except Exception as exc:
+                self.stop_error = str(exc)
+        self.stop_thread = threading.Thread(target=finish, name="microphone-stop", daemon=True)
+        self.stop_thread.start()
+
     def stop(self, interrupted=False):
+        if self.stop_thread and self.stop_thread.is_alive() and threading.current_thread() is not self.stop_thread:
+            self.stop_thread.join(timeout=10)
+            if self.stop_thread.is_alive():
+                raise RuntimeError("The microphone is still closing; captured audio has been saved.")
         if not self.note_id:
             return
+        with self.capture_lock:
+            self.stopping = True
         note_id = self.note_id
-        if self.stream:
-            self.stream.stop()
-            self.stream.close()
+        # Seal durable audio before touching CoreAudio: device shutdown can hang.
         if self.thread and self.thread.is_alive():
-            self.frames.put(None)
+            self.frames.put(None, timeout=10)
             self.thread.join(timeout=10)
             if self.thread.is_alive():
                 raise RuntimeError("Audio is still being saved. Keep the app open and retry stopping.")
+        elif not self.thread:
+            self.journal_sealed = True
         if self.guard:
             self.guard.terminate()
-            self.guard.wait()
+            try:
+                self.guard.wait(timeout=2)
+            except subprocess.TimeoutExpired:
+                self.guard.kill()
+                self.guard.wait()
         self.store.update(note_id, status="interrupted" if interrupted else "ready")
+        if self.stream:
+            self.stream.stop()
+            self.stream.close()
         self.stream = self.thread = self.guard = None
         self.note_id = None
         self.paused = False
+        self.stopping = False
 
     def check(self):
         if not self.note_id:
             return
+        if self.stopping:
+            if self.stop_error and not self.stop_error_reported:
+                self.stop_error_reported = True
+                self.notify({"event": "error", "message": self.stop_error})
+            return
         if self.fault:
             message = self.fault
-            self.stop(interrupted=True)
+            self.request_stop(interrupted=True)
             self.notify({"event": "error", "message": message})
         elif not self.paused and time.monotonic() - self.last_frame > 6:
             self.fault = "The microphone stopped delivering audio. Recording stopped; saved chunks are recoverable."

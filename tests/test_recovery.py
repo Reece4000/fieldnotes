@@ -1,9 +1,11 @@
 import os
+import json
 from pathlib import Path
 import subprocess
 import sys
 import tempfile
 import threading
+import time
 import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "worker"))
@@ -22,6 +24,91 @@ class RecoveryTests(unittest.TestCase):
     def tearDown(self):
         self.store.close()
         self.temp.cleanup()
+
+    def test_stop_does_not_leave_capture_feedback_running_while_device_closes(self):
+        from backend import Backend
+        events, closing, release = [], threading.Event(), threading.Event()
+        backend = Backend(Path(self.temp.name) / "stop.sqlite3", emit=events.append, fake_engine=True)
+        class SlowDevice:
+            def stop(self):
+                closing.set()
+                release.wait(2)
+            def close(self):
+                pass
+        try:
+            note = backend.store.create()
+            backend.recorder.note_id = note
+            backend.recorder.stream = SlowDevice()
+            backend.store.update(note, status="recording")
+            started = time.monotonic()
+            backend.command({"action": "stop"})
+            self.assertLess(time.monotonic() - started, .15, "Stop blocked on the audio device; button/reel cannot update")
+            self.assertTrue(closing.wait(1))
+            state = [e for e in events if e["event"] == "state"][-1]
+            self.assertTrue(state.get("stopping"), "The UI still reports normal capture after Stop")
+            backend.command({"action": "query"})
+            release.set()
+            backend.recorder.stop_thread.join(1)
+            backend.check_capture()
+            state = [e for e in events if e["event"] == "state"][-1]
+            self.assertEqual(state["active"], "")
+            self.assertFalse(state["stopping"])
+        finally:
+            release.set()
+            backend.shutdown()
+
+    def test_hung_device_restarts_only_after_the_capture_journal_is_sealed(self):
+        from backend import Backend
+        events, closing, release = [], threading.Event(), threading.Event()
+        backend = Backend(Path(self.temp.name) / "hung-stop.sqlite3", emit=events.append, fake_engine=True)
+        class HungDevice:
+            def stop(self):
+                closing.set()
+                release.wait(3)
+            def close(self):
+                pass
+        try:
+            note = backend.store.create()
+            recorder = backend.recorder
+            recorder.note_id, recorder.rate, recorder.stream = note, 16000, HungDevice()
+            backend.store.update(note, status="recording")
+            recorder.thread = threading.Thread(target=recorder.write_loop)
+            recorder.thread.start()
+            recorder.frames.put(b"\x00\x20" * 4000)
+            recorder.fault = "The microphone stopped delivering audio."
+            backend.command({"action": "stop"})
+            self.assertTrue(closing.wait(1), "The device close must follow journal sealing")
+            self.assertFalse(recorder.thread.is_alive())
+            self.assertEqual(backend.store.note(note)["duration"], .25)
+            self.assertEqual(backend.store.note(note)["status"], "ready")
+            self.assertEqual(backend.store.counts(note).get("open", 0), 0)
+            recorder.callback(b"\x00\x20" * 4000, 4000, None, None)
+            self.assertTrue(recorder.frames.empty(), "Capture continued after Stop")
+            recorder.stop_started -= 9
+            backend.check_capture()
+            self.assertTrue(backend.restarting)
+            self.assertEqual(sum(e["event"] == "restart" for e in events), 1)
+        finally:
+            release.set()
+            backend.shutdown()
+
+    def test_hung_close_exits_the_real_service_and_keeps_inflight_audio_recoverable(self):
+        path = Path(self.temp.name) / "stop-process.sqlite3"
+        result = subprocess.run([sys.executable, str(Path(__file__).with_name("stop_backend.py")), "--data", str(path)],
+                                input='{"action":"stop"}\n', text=True, capture_output=True, timeout=5)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        events = [json.loads(line) for line in result.stdout.splitlines()]
+        self.assertTrue(any(e["event"] == "state" and e.get("stopping") for e in events))
+        self.assertEqual(sum(e["event"] == "restart" for e in events), 1)
+        recovered = Store(path)
+        try:
+            recovered.recover()
+            note = recovered.db.execute("SELECT id,duration FROM notes").fetchone()
+            self.assertEqual(note[1], .25)
+            self.assertEqual(recovered.counts(note[0]).get("pending"), 1)
+            self.assertGreater(recovered.db.execute("SELECT count(*) FROM blocks").fetchone()[0], 0)
+        finally:
+            recovered.close()
 
     def test_sidebar_copy_returns_full_note_without_changing_selection(self):
         from backend import Backend

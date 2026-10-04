@@ -24,7 +24,7 @@ Item {
                 NumberAnimation on rotation {
                     id: reelSpin
                     from: 0; to: 360; duration: 3600; loops: Animation.Infinite
-                    running: deck.controller.recording && !deck.reduceMotion && deck.visible
+                    running: deck.controller.recording && !deck.controller.stopping && !deck.reduceMotion && deck.visible
                     paused: reelSpin.running && (deck.controller.paused || !deck.motionActive)
                 }
                 Repeater {

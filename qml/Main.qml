@@ -106,6 +106,7 @@ ApplicationWindow {
         function onCategoryCreated(name) { window.creating = false; creationDialog.close(); window.chosenCategory = name; window.trash = false; window.refreshQuery() }
         function onErrorChanged() { if (window.creating && window.c.error) { window.creationError = window.c.error; window.creating = false } }
         function onStateChanged() {
+            if (!window.c.connected) window.queryStarted = false
             if (window.c.connected && !window.queryStarted) { window.queryStarted = true; window.refreshQuery() }
             if (!window.loadedId && window.c.connected) window.loadDocument()
         }

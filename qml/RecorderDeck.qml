@@ -7,7 +7,7 @@ Item {
     required property var controller
     property bool reduceMotion: false
     property bool motionActive: true
-    property double voiceDb: -44
+    property double voiceDb: -72
     signal filterRequested()
     implicitHeight: 68
     RowLayout {

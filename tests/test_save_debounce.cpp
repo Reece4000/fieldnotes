@@ -111,6 +111,24 @@ private slots:
         QCOMPARE(controller->body(), QString("Newer queued text"));
         QCOMPARE(commands("update").size(), 2);
     }
+    void trashingAnotherNotePreservesSelectionAndUndoTargetsThatNote() {
+        QSignalSpy deleted(controller.get(), &Controller::deleted);
+        controller->trashNote("second");
+        QTRY_COMPARE_WITH_TIMEOUT(deleted.count(), 1, 2000);
+        QCOMPARE(controller->selectedId(), QString("first"));
+        QCOMPARE(controller->body(), QString("Original first"));
+        QCOMPARE(commands("delete").first().value("id").toString(), QString("second"));
+        controller->undoDelete();
+        QTRY_COMPARE_WITH_TIMEOUT(commands("restore").size(), 1, 2000);
+        QCOMPARE(commands("restore").first().value("id").toString(), QString("second"));
+        QCOMPARE(controller->selectedId(), QString("first"));
+        QCOMPARE(commands("select").size(), 0);
+    }
+    void trashingTheSelectedNoteOpensTheAdjacentRemainingNote() {
+        controller->trashNote("first");
+        QTRY_COMPARE_WITH_TIMEOUT(controller->selectedId(), QString("second"), 2000);
+        QCOMPARE(controller->body(), QString("Original second"));
+    }
 };
 QTEST_GUILESS_MAIN(SaveDebounceTest)
 #include "test_save_debounce.moc"

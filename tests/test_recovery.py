@@ -228,6 +228,18 @@ os._exit(23)
         self.assertGreater(max(events[-1]["waveform"]), .5)
         self.assertEqual(events[-1]["seconds"], .5)
 
+    def test_quiet_captured_input_still_registers_on_the_meter(self):
+        events = []
+        recorder = Recorder(self.store, events.append, threading.Event())
+        recorder.note_id, recorder.rate = self.note, 16000
+        recorder.frames.put(b"\x10\x00" * 4000)
+        recorder.frames.put(None)
+        recorder.write_loop()
+        self.assertLess(events[0]["db"], -60)
+        self.assertGreater(events[0]["level"], 0)
+        self.assertGreater(max(events[0]["waveform"]), 0)
+        self.assertEqual(self.store.note(self.note)["duration"], .25)
+
     def test_a_blocked_ui_pipe_does_not_block_audio_saves(self):
         code = """
 from backend import Backend

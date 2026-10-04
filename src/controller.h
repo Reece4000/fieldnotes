@@ -76,7 +76,7 @@ public:
     double level() const { return m_level; }
     Q_INVOKABLE void selectNote(const QString &id);
     Q_INVOKABLE void newNote(const QString &collection = "", const QString &workspace = "inbox");
-    Q_INVOKABLE void record(int device = -1, const QString &collection = "", const QString &workspace = "inbox", double voiceDb = -44);
+    Q_INVOKABLE void record(int device = -1, const QString &collection = "", const QString &workspace = "inbox", double voiceDb = -72);
     Q_INVOKABLE void query(const QString &workspace, const QString &collection, const QString &search, bool trash = false);
     Q_INVOKABLE void loadMore();
     Q_INVOKABLE void createWorkspace(const QString &name);
@@ -91,9 +91,10 @@ public:
     Q_INVOKABLE void copyNote(const QString &id);
     Q_INVOKABLE void exportNote(const QUrl &url);
     Q_INVOKABLE void deleteNote();
+    Q_INVOKABLE void trashNote(const QString &id);
     Q_INVOKABLE void undoDelete();
-    Q_INVOKABLE void restoreNote();
-    Q_INVOKABLE void retry();
+    Q_INVOKABLE void restoreNote(const QString &id = QString());
+    Q_INVOKABLE void retry(const QString &id = QString());
     Q_INVOKABLE void refreshDevices();
     Q_INVOKABLE void dismissError();
     Q_INVOKABLE void shutdown();
@@ -125,7 +126,7 @@ private:
     QFile m_log;
     QByteArray m_buffer;
     QVariantList m_notes, m_devices, m_workspaces, m_categories, m_waveform;
-    int m_total = 0;
+    int m_total = 0, m_deletionIndex = 0;
     QVariantMap m_document, m_capture;
     QHash<QString, QVariantMap> m_edits;
     QHash<QString, QVariantMap> m_pendingUpdates;

@@ -221,7 +221,7 @@ class Backend:
             self.emit({"event": "select", "id": note_id})
         elif action == "record":
             note_id = self.store.create(collection=command.get("collection", ""), workspace=command.get("workspace", "inbox"),
-                                        voice_db=max(-65, min(-20, command.get("voiceDb", -44))))
+                                        voice_db=max(-90, min(-20, command.get("voiceDb", -72))))
             self.selected = note_id
             self.emit({"event": "select", "id": note_id})
             try:
@@ -243,6 +243,8 @@ class Backend:
             if action == "delete" and (note_id == self.recorder.note_id or self.store.counts(note_id).get("processing")):
                 raise RuntimeError("Stop recording and finish transcription before deleting this note")
             self.store.update(note_id, deleted=int(action == "delete"))
+            if action == "delete":
+                self.emit({"event": "deleted", "id": note_id})
         elif action == "select":
             self.selected = note_id
         elif action == "query":

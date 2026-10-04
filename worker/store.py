@@ -63,7 +63,7 @@ class Store:
             if "workspace" not in columns:
                 self.db.execute("ALTER TABLE notes ADD COLUMN workspace TEXT NOT NULL DEFAULT 'inbox'")
             if "voice_db" not in columns:
-                self.db.execute("ALTER TABLE notes ADD COLUMN voice_db REAL NOT NULL DEFAULT -44")
+                self.db.execute("ALTER TABLE notes ADD COLUMN voice_db REAL NOT NULL DEFAULT -72")
             if "auto_title" not in columns:
                 self.db.execute("ALTER TABLE notes ADD COLUMN auto_title INTEGER NOT NULL DEFAULT 1")
                 self.db.execute("UPDATE notes SET auto_title=0 WHERE title NOT LIKE 'Recording · %' AND title NOT IN ('Untitled note','Untitled')")
@@ -74,7 +74,7 @@ class Store:
             from notes_reader import VIEW_SQL
             self.db.execute("CREATE VIEW IF NOT EXISTS notes_readonly AS " + VIEW_SQL)
 
-    def create(self, title=None, collection="", workspace="inbox", voice_db=-44):
+    def create(self, title=None, collection="", workspace="inbox", voice_db=-72):
         note_id = str(uuid.uuid4())
         now = time.time()
         with self.lock, self.db:

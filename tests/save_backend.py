@@ -19,7 +19,7 @@ def emit(event):
 
 def state():
     emit({"event": "state", "document": notes[selected],
-          "notes": list(notes.values()), "workspaces": [], "categories": [],
+          "notes": [note for note in notes.values() if not note["deleted"]], "workspaces": [], "categories": [],
           "total": 2, "active": "", "capture": {}, "engine": "ready"})
 
 
@@ -36,6 +36,11 @@ for line in sys.stdin:
         state()
     elif command["action"] == "select":
         selected = command["id"]
+        state()
+    elif command["action"] in ("delete", "restore"):
+        notes[command["id"]]["deleted"] = command["action"] == "delete"
+        if command["action"] == "delete":
+            emit({"event": "deleted", "id": command["id"]})
         state()
     elif command["action"] == "shutdown":
         break

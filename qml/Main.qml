@@ -55,11 +55,21 @@ ApplicationWindow {
     property bool creating: false
     property string creationError: ""
     property bool reducedMotion: preferences.reduceMotion || c.systemReduceMotion
+    property var contextNote: ({})
+    property string renameTarget: ""
+    property string contextCategory: ""
+    function canTrash(note) { return !!(note && note.id && !note.deleted && note.status !== "recording" && note.status !== "paused" && (note.pending || 0) <= (note.errors || 0)) }
+    function openNoteMenu(note, item, x, y) { contextNote = note; sidebarNoteMenu.popup(item, x, y) }
+    function renameNote(id) {
+        renameTarget = id
+        if (c.selectedId === id) { titleField.forceActiveFocus(); titleField.selectAll(); renameTarget = "" }
+        else c.selectNote(id)
+    }
     property var categoryRows: [{name: "All notes", value: "*"}, {name: "Unfiled", value: ""}].concat(
         c.categories.filter(n => n.workspace === chosenWorkspace).map(n => ({name: n.name, value: n.name, count: n.count})))
     property var noteCategories: [{name: "Unfiled", value: ""}].concat(
         c.categories.filter(n => n.workspace === c.workspace).map(n => ({name: n.name, value: n.name})))
-    Settings { id: preferences; location: window.c.settingsFile; property double voiceDb: -44; property bool reduceMotion: false; property string lastWorkspace: "inbox" }
+    Settings { id: preferences; location: window.c.settingsFile; property double voiceDb: -72; property bool reduceMotion: false; property string lastWorkspace: "inbox" }
     function refreshQuery() { if (c.connected) c.query(chosenWorkspace, chosenCategory, searchField.text, trash) }
     function currentCategory() { return chosenCategory === "*" || trash ? "" : chosenCategory }
     function recordToggle() { if (c.connected) { if (c.recording) c.stop(); else c.record(deviceId, recordingCategory, recordingWorkspace, preferences.voiceDb) } }
@@ -81,6 +91,7 @@ ApplicationWindow {
         if (changed) { transcriptSearch.text = ""; findPosition = -1 }
         if (changed || follow) Qt.callLater(function() { transcriptView.contentY = changed ? 0 : Math.max(0, transcriptView.contentHeight - transcriptView.height) })
         syncing = false
+        if (renameTarget === c.selectedId) Qt.callLater(function() { titleField.forceActiveFocus(); titleField.selectAll(); renameTarget = "" })
     }
     onChosenWorkspaceChanged: { preferences.lastWorkspace = chosenWorkspace; chosenCategory = "*"; trash = false; refreshQuery() }
     onChosenCategoryChanged: refreshQuery()
@@ -106,6 +117,43 @@ ApplicationWindow {
     Shortcut { sequences: [StandardKey.Find]; onActivated: transcriptSearch.forceActiveFocus() }
     Shortcut { sequence: "Meta+Shift+F"; onActivated: searchField.forceActiveFocus() }
     Shortcut { sequence: "Meta+E"; enabled: !!window.c.selectedId; onActivated: exportDialog.open() }
+    Shortcut { sequence: "Escape"; enabled: noteDragGhost.dragging; onActivated: { noteDragGhost.Drag.cancel(); noteDragGhost.dragging = false } }
+    FieldMenu {
+        id: sidebarNoteMenu
+        FieldMenuItem { text: "Copy transcript"; onTriggered: window.c.copyNote(window.contextNote.id) }
+        FieldMenuItem { text: "Rename note"; enabled: !window.contextNote.deleted; onTriggered: window.renameNote(window.contextNote.id) }
+        FieldMenuItem { text: "Retry unfinished audio"; enabled: (window.contextNote.errors || 0) > 0; onTriggered: window.c.retry(window.contextNote.id) }
+        MenuSeparator { padding: 4; contentItem: Rectangle { implicitHeight: 1; color: "#dce2d4" } }
+        FieldMenuItem {
+            text: window.contextNote.deleted ? "Restore note" : "Move note to Trash"
+            enabled: !!window.contextNote.deleted || window.canTrash(window.contextNote)
+            onTriggered: window.contextNote.deleted ? window.c.restoreNote(window.contextNote.id) : window.c.trashNote(window.contextNote.id)
+            ToolTip.visible: hovered && !enabled; ToolTip.text: "Stop recording and finish transcription before moving this note to Trash."
+        }
+    }
+    FieldMenu {
+        id: categoryMenu
+        FieldMenuItem { text: "New note in this category"; onTriggered: window.c.newNote(window.contextCategory, window.chosenWorkspace) }
+        FieldMenuItem { text: "New category…"; onTriggered: window.create("category") }
+    }
+    FieldMenu {
+        id: workspaceMenu
+        FieldMenuItem { text: "New note"; onTriggered: window.newNote() }
+        FieldMenuItem { text: "New category…"; onTriggered: window.create("category") }
+        FieldMenuItem { text: "New workspace…"; onTriggered: window.create("workspace") }
+    }
+    Rectangle {
+        id: noteDragGhost
+        parent: Overlay.overlay
+        property string noteId: ""
+        property string noteTitle: ""
+        property bool dragging: false
+        visible: dragging; width: 210; height: 38; z: 100
+        color: "#e4ecdd"; radius: 6; border.color: "#8ea782"; opacity: .94
+        Drag.active: dragging; Drag.source: noteDragGhost; Drag.keys: ["fieldnotes-note"]
+        Drag.supportedActions: Qt.MoveAction; Drag.hotSpot.x: width / 2; Drag.hotSpot.y: height / 2
+        Text { anchors.fill: parent; anchors.margins: 10; text: noteDragGhost.noteTitle; color: "#293c2a"; font.pixelSize: 12; elide: Text.ElideRight; verticalAlignment: Text.AlignVCenter }
+    }
     FileDialog { id: exportDialog; title: "Export note"; fileMode: FileDialog.SaveFile; nameFilters: ["Markdown notes (*.md)", "Text files (*.txt)"]; defaultSuffix: "md"; onAccepted: window.c.exportNote(selectedFile) }
     FieldDialog {
         id: creationDialog
@@ -120,7 +168,7 @@ ApplicationWindow {
         }
         contentItem: ColumnLayout {
             spacing: 8
-            TextField { id: creationName; Layout.fillWidth: true; placeholderText: window.creationKind === "workspace" ? "e.g. HCI research" : "e.g. Debugging runs"; Accessible.name: "Name"; selectByMouse: true; enabled: !window.creating; color: "#293d2b"; placeholderTextColor: "#738275"; leftPadding: 10; implicitHeight: 36; background: Rectangle { radius: 5; color: "white"; border.color: creationName.activeFocus ? "#61866c" : "#cbd5c6" } onAccepted: creationDialog.submit() }
+            TextField { id: creationName; Layout.fillWidth: true; placeholderText: window.creationKind === "workspace" ? "e.g. HCI research" : "e.g. Debugging runs"; Accessible.name: "Name"; selectByMouse: true; enabled: !window.creating; color: "#293d2b"; placeholderTextColor: "#738275"; leftPadding: 10; implicitHeight: 36; background: Rectangle { radius: 5; color: "white"; border.color: creationName.activeFocus ? "#61866c" : "#cbd5c6" } onAccepted: creationDialog.submit(); TextContextMenu { field: creationName } }
             Text { Layout.fillWidth: true; Layout.preferredHeight: 32; text: window.creationError; color: "#a33d28"; wrapMode: Text.WordWrap; font.pixelSize: 11 }
             RowLayout {
             Layout.fillWidth: true; spacing: 8
@@ -139,7 +187,7 @@ ApplicationWindow {
             RowLayout { Layout.fillWidth: true; Text { text: "Quiet voices"; font.pixelSize: 11; color: "#65765c" } Item { Layout.fillWidth: true } Text { text: "Nearby voices"; font.pixelSize: 11; color: "#65765c" } }
             Slider {
                 id: voiceSlider
-                Layout.fillWidth: true; from: -65; to: -20; stepSize: 1; value: preferences.voiceDb; Accessible.name: "Minimum voice level"; onMoved: preferences.voiceDb = value
+                Layout.fillWidth: true; from: -90; to: -20; stepSize: 1; value: preferences.voiceDb; Accessible.name: "Minimum voice level"; onMoved: preferences.voiceDb = value
                 background: Rectangle { x: voiceSlider.leftPadding; y: (voiceSlider.height - height) / 2; width: voiceSlider.availableWidth; height: 5; radius: 3; color: "#d8e1d5"; Rectangle { width: voiceSlider.visualPosition * parent.width; height: parent.height; radius: 3; color: "#6f987a" } }
                 handle: Rectangle { x: voiceSlider.leftPadding + voiceSlider.visualPosition * (voiceSlider.availableWidth - width); y: (voiceSlider.height - height) / 2; implicitWidth: 22; implicitHeight: 22; radius: 11; color: voiceSlider.pressed ? "#edf3e8" : "white"; border.color: voiceSlider.activeFocus ? "#264e38" : "#76957a"; border.width: 2 }
             }
@@ -201,6 +249,7 @@ ApplicationWindow {
                         currentIndex: Math.max(0, window.c.workspaces.findIndex(n => n.id === window.chosenWorkspace))
                         Accessible.name: "Workspace"
                         onActivated: window.chosenWorkspace = model[currentIndex].id
+                        MouseArea { anchors.fill: parent; acceptedButtons: Qt.RightButton; onPressed: mouse => workspaceMenu.popup(workspacePicker, mouse.x, mouse.y) }
                     }
                     ActionButton { text: "+"; quiet: true; Accessible.name: "New workspace"; onClicked: window.create("workspace"); ToolTip.visible: hovered; ToolTip.text: "New workspace" }
                 }
@@ -212,6 +261,7 @@ ApplicationWindow {
                     Accessible.name: "Search notes"
                     onTextChanged: searchTimer.restart()
                     background: Rectangle { color: "#f9faf5"; radius: 5; border.color: searchField.activeFocus ? "#64815a" : "#d5ddcd" }
+                    TextContextMenu { field: searchField }
                 }
                 RowLayout {
                     Layout.fillWidth: true
@@ -231,6 +281,7 @@ ApplicationWindow {
                         width: ListView.view.width; height: 33; leftPadding: 9; rightPadding: 9; hoverEnabled: true
                         Accessible.name: modelData.name
                         onClicked: { window.trash = false; window.chosenCategory = modelData.value; window.refreshQuery() }
+                        MouseArea { anchors.fill: parent; acceptedButtons: Qt.RightButton; onPressed: mouse => { window.contextCategory = categoryDelegate.modelData.value === "*" ? "" : categoryDelegate.modelData.value; categoryMenu.popup(categoryDelegate, mouse.x, mouse.y) } }
                         background: Rectangle { radius: 4; color: !window.trash && window.chosenCategory === categoryDelegate.modelData.value ? "#dce5d3" : categoryDelegate.hovered ? "#e4eadd" : "transparent"; border.width: categoryDelegate.activeFocus ? 1 : 0; border.color: "#55784c" }
                         contentItem: RowLayout {
                             spacing: 13
@@ -258,10 +309,38 @@ ApplicationWindow {
                     delegate: ItemDelegate {
                         id: noteDelegate
                         required property var modelData
+                        required property int index
                         width: ListView.view.width; height: 58
                         leftPadding: 10; rightPadding: 10; topPadding: 8; bottomPadding: 7; hoverEnabled: true
                         Accessible.name: modelData.title + ", " + (modelData.collection || "Unfiled")
-                        onClicked: window.c.selectNote(modelData.id)
+                        onClicked: { noteList.currentIndex = index; forceActiveFocus(); window.c.selectNote(modelData.id) }
+                        Keys.onPressed: event => {
+                            if ((event.key === Qt.Key_Delete || event.key === Qt.Key_Backspace) && window.canTrash(modelData)) { window.c.trashNote(modelData.id); event.accepted = true }
+                            else if (event.key === Qt.Key_Menu || (event.key === Qt.Key_F10 && event.modifiers & Qt.ShiftModifier)) { window.openNoteMenu(modelData, noteDelegate, 12, height); event.accepted = true }
+                        }
+                        MouseArea { anchors.fill: parent; acceptedButtons: Qt.RightButton; onPressed: mouse => window.openNoteMenu(noteDelegate.modelData, noteDelegate, mouse.x, mouse.y) }
+                        DragHandler {
+                            id: noteDrag
+                            target: null; acceptedButtons: Qt.LeftButton; acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
+                            enabled: window.canTrash(noteDelegate.modelData)
+                            function positionGhost() {
+                                let p = noteDelegate.mapToItem(noteDragGhost.parent, centroid.position.x, centroid.position.y)
+                                noteDragGhost.x = p.x - noteDragGhost.width / 2
+                                noteDragGhost.y = p.y - noteDragGhost.height / 2
+                            }
+                            onCentroidChanged: if (active && noteDragGhost.dragging) positionGhost()
+                            onActiveChanged: {
+                                if (active) {
+                                    noteDragGhost.noteId = noteDelegate.modelData.id
+                                    noteDragGhost.noteTitle = noteDelegate.modelData.title
+                                    positionGhost(); noteDragGhost.dragging = true
+                                } else {
+                                    if (noteDragGhost.dragging) noteDragGhost.Drag.drop()
+                                    noteDragGhost.dragging = false; noteDragGhost.noteId = ""
+                                }
+                            }
+                            onCanceled: { noteDragGhost.Drag.cancel(); noteDragGhost.dragging = false }
+                        }
                         background: Rectangle { radius: 4; color: window.c.selectedId === noteDelegate.modelData.id ? "#dce5d3" : noteDelegate.hovered ? "#e4eadd" : "transparent"; border.width: noteDelegate.activeFocus ? 1 : 0; border.color: "#55784c" }
                         contentItem: ColumnLayout {
                             spacing: 4
@@ -296,10 +375,25 @@ ApplicationWindow {
                     }
                     footer: ActionButton { width: noteList.width; text: "Load more notes"; visible: noteList.count < window.c.total; height: visible ? 32 : 0; onClicked: window.c.loadMore() }
                     Text { anchors.centerIn: parent; width: parent.width - 16; horizontalAlignment: Text.AlignHCenter; wrapMode: Text.WordWrap; text: searchField.text ? "No matching notes." : window.trash ? "Trash is empty." : "No notes here yet.\nRecord a session or add a note."; color: "#74806c"; font.pixelSize: 12; visible: !noteList.count }
+                    MouseArea { anchors.fill: parent; enabled: !noteList.count; acceptedButtons: Qt.RightButton; onPressed: mouse => workspaceMenu.popup(noteList, mouse.x, mouse.y) }
                 }
                 RowLayout {
                     Layout.fillWidth: true
-                    ActionButton { text: "Trash"; glyph: "trash"; quiet: !window.trash; implicitHeight: 28; onClicked: { window.trash = !window.trash; window.chosenCategory = "*" } }
+                    ActionButton {
+                        id: trashButton
+                        text: "Trash"; glyph: "trash"; quiet: !window.trash; implicitHeight: 28
+                        onClicked: { window.trash = !window.trash; window.chosenCategory = "*" }
+                        ToolTip.visible: hovered; ToolTip.text: "Drag a note here to move it to Trash. Notes can be restored."
+                        background: Rectangle { radius: 7; color: trashDrop.containsDrag ? "#d4e3cb" : trashButton.down ? "#d9ddd0" : trashButton.hovered ? "#e6e8de" : window.trash ? "#f8faf6" : "transparent"; border.width: trashDrop.containsDrag || trashButton.activeFocus ? 1 : 0; border.color: "#55784c" }
+                        DropArea {
+                            id: trashDrop
+                            anchors.fill: parent; keys: ["fieldnotes-note"]
+                            onEntered: drag => { drag.accepted = drag.source === noteDragGhost && !!noteDragGhost.noteId }
+                            onDropped: drop => {
+                                if (drop.source === noteDragGhost && noteDragGhost.noteId) { window.c.trashNote(noteDragGhost.noteId); drop.accept(Qt.MoveAction) }
+                            }
+                        }
+                    }
                     Item { Layout.fillWidth: true }
                     Rectangle { Layout.preferredWidth: 5; Layout.preferredHeight: 5; radius: 3; color: window.c.engineStatus === "ready" ? "#557d46" : window.c.engineStatus === "error" ? "#b44530" : "#b39140" }
                     Text { text: "Phonon-2"; font.pixelSize: 10; color: "#62735c"; ToolTip.visible: engineHover.hovered; ToolTip.text: window.c.engineStatus === "ready" ? "Local transcription ready" : window.c.engineStatus === "error" ? window.c.engineError : "Preparing the local model"; HoverHandler { id: engineHover } }
@@ -325,6 +419,7 @@ ApplicationWindow {
                         font.pixelSize: 24; font.weight: Font.DemiBold
                         color: "#123b2b"; placeholderTextColor: "#6a7c70"; padding: 0; selectByMouse: true
                         Accessible.name: "Note title"
+                        TextContextMenu { field: titleField }
                         onTextEdited: if (!window.syncing) window.c.updateTitle(text)
                         background: Rectangle { color: "transparent"; border.width: titleField.activeFocus ? 1 : 0; border.color: "#8da67d"; radius: 3 }
                     }
@@ -389,6 +484,7 @@ ApplicationWindow {
                             placeholderText: "Find in transcript"; color: "#293d2b"; placeholderTextColor: "#768377"; font.pixelSize: 11; selectByMouse: true; leftPadding: 30
                             FieldIcon { name: "search"; width: 15; height: 15; x: 9; anchors.verticalCenter: parent.verticalCenter; tint: "#7a8d7d" }
                             Accessible.name: "Search transcript"
+                            TextContextMenu { field: transcriptSearch }
                             onAccepted: window.findTranscript(false)
                             onTextEdited: { window.findPosition = -1; window.findTranscript(false) }
                             background: Rectangle { color: "#f8faf6"; radius: 5; border.color: transcriptSearch.activeFocus ? "#64815a" : "#e0e7dd" }
@@ -418,6 +514,7 @@ ApplicationWindow {
                                     : window.c.noteStatus === "recording" || window.c.noteStatus === "paused" ? "Waiting for the first transcribed section…"
                                     : window.c.pending ? "Transcribing…" : "Write a note…"
                                 Accessible.name: "Note transcript"
+                                TextContextMenu { field: editor }
                                 onTextChanged: if (!window.syncing && window.c.editable) window.c.updateBody(text)
                                 onCursorRectangleChanged: window.revealCursor()
                                 background: Rectangle { color: "transparent" }

@@ -94,5 +94,44 @@ class OrganizationTests(unittest.TestCase):
         finally:
             backend.shutdown()
 
+    def test_recording_floor_defaults_to_72_and_accepts_90(self):
+        from backend import Backend
+        from unittest.mock import patch
+        backend = Backend(Path(self.temp.name) / 'floors.db', emit=lambda _: None, fake_engine=True)
+        try:
+            with patch.object(backend.recorder, 'start'):
+                for requested, expected in ((None, -72), (-72, -72), (-90, -90), (-100, -90), (0, -20)):
+                    command = {'action': 'record'}
+                    if requested is not None:
+                        command['voiceDb'] = requested
+                    backend.command(command)
+                    self.assertEqual(backend.store.note(backend.selected)['voice_db'], expected)
+        finally:
+            backend.shutdown()
+
+    def test_targeted_trash_is_reversible_and_preserves_the_open_document(self):
+        from backend import Backend
+        events = []
+        backend = Backend(Path(self.temp.name) / 'trash.db', emit=events.append, fake_engine=True)
+        try:
+            opened = backend.store.create('Open note')
+            target = backend.store.create('Context-menu target')
+            backend.store.update(target, body='Text to retain after restoring.')
+            backend.selected = opened
+            backend.command({'action': 'delete', 'id': target})
+            self.assertEqual(backend.selected, opened)
+            self.assertTrue(backend.store.note(target)['deleted'])
+            self.assertIn({'event': 'deleted', 'id': target}, events)
+            self.assertEqual([e for e in events if e['event'] == 'state'][-1]['document']['id'], opened)
+            backend.command({'action': 'restore', 'id': target})
+            self.assertFalse(backend.store.note(target)['deleted'])
+            self.assertEqual(backend.store.note(target)['body'], 'Text to retain after restoring.')
+            backend.recorder.note_id = target
+            with self.assertRaisesRegex(RuntimeError, 'Stop recording'):
+                backend.command({'action': 'delete', 'id': target})
+            backend.recorder.note_id = None
+        finally:
+            backend.shutdown()
+
 
 if __name__ == '__main__': unittest.main()

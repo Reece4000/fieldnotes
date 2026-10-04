@@ -7,7 +7,7 @@ qt_standard_project_setup(REQUIRES 6.9)
 qt_policy(SET QTP0004 NEW)
 set(FIELDNOTES_PYTHON "${CMAKE_SOURCE_DIR}/.venv/bin/python" CACHE FILEPATH "Speech runtime Python")
 qt_add_executable(Fieldnotes MACOSX_BUNDLE src/main.cpp src/controller.cpp src/controller.h src/note_model.cpp src/note_model.h src/platform.mm)
-qt_add_qml_module(Fieldnotes URI Fieldnotes VERSION 1.0 QML_FILES qml/Main.qml qml/ActionButton.qml qml/FieldMenuItem.qml qml/FieldMenu.qml qml/FieldCombo.qml qml/CopyButton.qml qml/RecorderDeck.qml qml/RecordingConsole.qml qml/Waveform.qml qml/FieldDialog.qml qml/FieldIcon.qml qml/TapeReel.qml qml/Surface.qml)
+qt_add_qml_module(Fieldnotes URI Fieldnotes VERSION 1.0 QML_FILES qml/Main.qml qml/TextContextMenu.qml qml/ActionButton.qml qml/FieldMenuItem.qml qml/FieldMenu.qml qml/FieldCombo.qml qml/CopyButton.qml qml/RecorderDeck.qml qml/RecordingConsole.qml qml/Waveform.qml qml/FieldDialog.qml qml/FieldIcon.qml qml/TapeReel.qml qml/Surface.qml)
 target_link_libraries(Fieldnotes PRIVATE Qt6::Core Qt6::Gui Qt6::Quick Qt6::QuickControls2 "-framework AppKit")
 set_target_properties(Fieldnotes PROPERTIES
   MACOSX_BUNDLE_INFO_PLIST "${CMAKE_SOURCE_DIR}/src/Info.plist.in"

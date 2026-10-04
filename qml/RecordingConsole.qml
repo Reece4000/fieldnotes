@@ -12,7 +12,7 @@ Surface {
     property string destination: ""
     property string destinationCategory: ""
     property string destinationWorkspace: "inbox"
-    property double voiceDb: -44
+    property double voiceDb: -72
     readonly property bool detailed: width > 760
     readonly property bool referenceLayout: detailed && !compact
     readonly property string microphoneName: devicePicker.displayText

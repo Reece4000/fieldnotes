@@ -18,7 +18,7 @@ def main():
         from scipy.signal import resample_poly
         from fermion.transcribe import _resolve
         from fermion._speech import backends, fetch
-        from speech_gate import SpeechGate
+        from speech_gate import SpeechGate, normalise_speech
         gate = SpeechGate()
         repo, key, pin, local = _resolve("phonon-2")
         path = local or fetch.ensure(repo, key, pin)
@@ -37,8 +37,8 @@ def main():
                     divisor = math.gcd(rate, 16000)
                     audio = resample_poly(audio, 16000 // divisor, rate // divisor)
                 words, texts = [], []
-                for start, end in gate.spans(audio, request.get("voiceDb", -44)):
-                    result = speech.transcribe_array_detailed(audio[start:end])
+                for start, end in gate.spans(audio, request.get("voiceDb", -72)):
+                    result = speech.transcribe_array_detailed(normalise_speech(audio[start:end]))
                     if result.truncated:
                         raise RuntimeError("The model returned an incomplete segment")
                     if result.text.strip() and not result.words:

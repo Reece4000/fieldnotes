@@ -83,7 +83,7 @@ def main():
                                       np.random.default_rng(4).normal(0, .02, 16000 * 12), background,
                                       np.zeros(16000 * 5)))
             fixture = (np.clip(fixture, -1, 1) * 32767).astype("<i2")
-            gate_note = backend.store.create()
+            gate_note = backend.store.create(voice_db=-44)
             capture = Recorder(backend.store, lambda _: None, backend.wake)
             capture.note_id, capture.rate = gate_note, 16000
             writer = threading.Thread(target=capture.write_loop)

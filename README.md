@@ -32,6 +32,8 @@ Open `build/Fieldnotes.app` (or the installed app in Applications).
 - **Export** / **⌘E** saves Markdown or plain text with timestamps.
 - **⌘N** creates a text note. **⌘F** searches the open transcript; **⌘⇧F** searches the workspace. Use the arrows beside transcript search to move between highlighted matches.
 - Deleted notes go to **Trash**, with immediate undo and later restoration from the note menu.
+- Right-click a sidebar note to copy, rename, retry unfinished audio, move it to Trash, or restore it. The menu acts on that note without changing the open document unless you choose Rename. With a note row focused, **Delete / Backspace** moves it to Trash; **Shift+F10** opens its menu. You can also drag a finished note onto Trash. Recording/transcribing notes cannot be dragged to Trash.
+- Titles, transcripts and search fields have right-click editing menus for undo/redo, cut/copy/paste, deleting a selection and selecting all. Deleting text in an editor never deletes the note. Right-click a category or workspace picker for creation actions.
 
 The microphone permission is requested only on the first recording. Select an input device in the recording console. If denied, enable Fieldnotes in System Settings → Privacy & Security → Microphone.
 
@@ -39,7 +41,9 @@ The microphone permission is requested only on the first recording. Select an in
 
 A small tape reel beside the input meter rotates during capture and freezes when paused or inactive. A rolling four-second waveform and dBFS input level update from audio that has reached the recovery journal, independently of transcription. Copy confirms with an animated tick in a reserved space beside the button. Status messages and errors occupy a fixed strip and never change the document layout. Scroll views stop at their bounds without overshoot; the sidebar keeps its width when the window resizes.
 
-Silero VAD runs locally in the isolated inference process before Phonon-2. Only sustained speech spans above the minimum voice level are decoded; quiet/noise spans complete without transcript text and their recovery PCM is erased. Cropped speech retains its original timestamps. **Voice filter** adjusts the minimum level for new recordings (default −44 dBFS). Move towards Nearby voices to suppress faint background speech; towards Quiet voices if your own speech is being missed. This is a speech/volume gate, not speaker identification: loud background speech may still be transcribed, and no gate eliminates every recognition error. macOS Reduce Motion and the app's Reduce motion checkbox freeze the reel and remove tick scaling.
+Silero VAD runs locally in the isolated inference process before Phonon-2. Only sustained speech spans above the minimum voice level are decoded; quiet/noise spans complete without transcript text and their recovery PCM is erased. Cropped speech retains its original timestamps. **Voice filter** adjusts the minimum level for new recordings (default −72 dBFS; adjustable down to −90 dBFS). Move towards Nearby voices to suppress faint background speech; towards Quiet voices if your own speech is being missed. This is a speech/volume gate, not speaker identification: loud background speech may still be transcribed, and no gate eliminates every recognition error. macOS Reduce Motion and the app's Reduce motion checkbox freeze the reel and remove tick scaling.
+
+Quiet inference input is raised for the speech detector and recogniser. The voice-level filter and input meter still use the original captured level, so inference gain does not bypass the filter. Short gaps between syllables stay within the same speech span to preserve opening words and decoding context.
 
 ## Recovery and audio lifecycle
 
@@ -86,9 +90,10 @@ Sidebar copying should leave selection unchanged and show its tick in place.
 ctest --test-dir build --output-on-failure
 .venv/bin/python -m unittest discover -s tests -v
 .venv/bin/python scripts/validate_transcription.py
+.venv/bin/python scripts/validate_quiet_transcription.py
 ```
 
-The native controller tests verify edit batching after a 750 ms quiet period, combined title/body updates, immediate flushing on note switches and shutdown, immediate organisation changes, and preservation of newer text when an older save acknowledgement arrives.
+The native controller tests verify edit batching after a 750 ms quiet period, combined title/body updates, immediate flushing on note switches and shutdown, immediate organisation changes, preservation of newer text when an older save acknowledgement arrives, and targeted Trash/Undo without changing another open note. The quiet-speech integration check uses the reported "Test, test, testing. This is a test voice note" phrase at −62 and −82 dBFS, through the real capture journal, 16/44.1 kHz resampling and local model, and checks word retention, timestamps and audio deletion.
 
 The unit suite tests process-crash recovery, transaction rollback, audio deletion, retry ordering, sample-aligned overlaps, journal-driven waveform telemetry, quiet/noise rejection through the actual engine protocol, faint/normal speech detection, legacy database migration, automatic/manual titles, workspaces/categories, paged search, persistent edits/trash, and a simulated three-minute recording. The opt-in integration check synthesizes over three minutes of speech with macOS `say`, passes it through the actual chunk writer and local model, checks repeated content survived, and verifies all temporary recovery audio was deleted. Its temporary audio and database are removed automatically.
 

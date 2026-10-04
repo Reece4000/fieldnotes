@@ -123,7 +123,7 @@ void Controller::handle(const QJsonObject &event) {
         if (m_deletionPending == documentId && document.value("deleted").toBool()) {
             m_deletionPending.clear();
             emit deleted();
-            if (!m_notes.isEmpty()) selectNote(m_notes.first().toMap().value("id").toString());
+            if (!m_notes.isEmpty()) selectNote(m_notes[qMin(m_deletionIndex, int(m_notes.size()) - 1)].toMap().value("id").toString());
             else {
                 m_selected.clear(); m_document.clear(); emit documentChanged();
                 send({{"action", "select"}, {"id", ""}});
@@ -157,6 +157,10 @@ void Controller::handle(const QJsonObject &event) {
         emit workspaceCreated(event.value("id").toString());
     } else if (type == "category") {
         emit categoryCreated(event.value("name").toString());
+    } else if (type == "deleted") {
+        m_deleted = event.value("id").toString();
+        // The selected-note state below also chooses a replacement document.
+        if (m_deleted != m_selected) emit deleted();
     } else if (type == "devices") {
         m_devices = event.value("devices").toArray().toVariantList();
         emit devicesChanged();
@@ -261,16 +265,24 @@ void Controller::exportNote(const QUrl &url) {
     }
     emit exported();
 }
-void Controller::deleteNote() {
-    if (m_selected.isEmpty()) return;
+void Controller::deleteNote() { trashNote(m_selected); }
+void Controller::trashNote(const QString &id) {
+    if (id.isEmpty()) return;
     flushEdits();
-    m_deleted = m_selected;
-    m_deletionPending = m_selected;
-    send({{"action", "delete"}, {"id", m_selected}});
+    if (id == m_selected) {
+        m_deletionPending = id;
+        m_deletionIndex = 0;
+        for (int i = 0; i < m_notes.size(); ++i) {
+            if (m_notes[i].toMap().value("id").toString() == id) { m_deletionIndex = i; break; }
+        }
+    }
+    send({{"action", "delete"}, {"id", id}});
 }
 void Controller::undoDelete() { if (!m_deleted.isEmpty()) send({{"action", "restore"}, {"id", m_deleted}}); }
-void Controller::restoreNote() { if (trashed()) send({{"action", "restore"}, {"id", m_selected}}); }
-void Controller::retry() { send({{"action", "retry"}, {"id", m_selected}}); }
+void Controller::restoreNote(const QString &id) {
+    if (!id.isEmpty() || trashed()) send({{"action", "restore"}, {"id", id.isEmpty() ? m_selected : id}});
+}
+void Controller::retry(const QString &id) { send({{"action", "retry"}, {"id", id.isEmpty() ? m_selected : id}}); }
 void Controller::refreshDevices() { send({{"action", "devices"}}); }
 void Controller::dismissError() { m_error.clear(); emit errorChanged(); }
 void Controller::setError(const QString &value) { m_error = value; emit errorChanged(); }

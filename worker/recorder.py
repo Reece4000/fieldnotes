@@ -76,7 +76,7 @@ class Recorder:
         tail = b""
         silence = 0.0
         waveform = deque([0.0] * 160, maxlen=160)
-        voice_floor = 10 ** (self.store.note(self.note_id).get("voice_db", -44) / 20)
+        voice_floor = 10 ** (self.store.note(self.note_id).get("voice_db", -72) / 20)
         try:
             while True:
                 pcm = self.frames.get()
@@ -111,7 +111,7 @@ class Recorder:
                 for frame in np.array_split(samples, 10):
                     amplitude = float(np.sqrt(np.mean(frame * frame))) if len(frame) else 0
                     waveform.append(min(1, math.sqrt(amplitude * 8)))
-                self.notify({"event": "meter", "seconds": elapsed, "level": max(0, min(1, (db + 60) / 60)),
+                self.notify({"event": "meter", "seconds": elapsed, "level": max(0, min(1, (db + 90) / 90)),
                              "db": db, "waveform": list(waveform)})
                 if elapsed - start >= 20 or (elapsed - start >= 2 and silence >= 0.75):
                     self.store.close_segment(segment_id)

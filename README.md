@@ -1,106 +1,117 @@
 # Fieldnotes
 
-Fieldnotes is a lightweight QtQuick desktop notebook for speaking through debugging runs and HCI tests, then organising and editing the resulting transcripts. It records the microphone and transcribes locally with Phonon-2 on Apple silicon Macs running **macOS Sequoia 15 or later**.
+Fieldnotes is a QtQuick desktop app for recording spoken notes and transcribing them locally. It supports long debugging sessions, HCI tests and other work where recording observations is easier than typing them.
 
-The app grew out of a recurring problem: spending many minutes recording a debugging session in an IDE, only to lose the recording or transcript. Capturing the session reliably comes first; transcription and the interface run separately from audio capture.
+The project focuses on reliable long-form capture, editable transcripts and organised notes. Microphone capture runs independently of the interface and transcription engine, with audio saved to a recovery journal as it arrives.
 
-## Requirements and current behaviour
+## Features
 
-| Original requirement | Current implementation |
-| --- | --- |
-| Lightweight QtQuick app; JUCE unnecessary | Native C++/QtQuick UI, without JUCE. The separate Python/MLX speech runtime is larger than the UI. |
-| Reasonably accurate transcription on Sequoia | Local Phonon-2 transcription for English on Apple silicon. Speech detection and an adjustable voice-level filter reduce silence/noise hallucinations. Technical vocabulary and recognition errors still need review. |
-| Easy organisation and copying | Workspaces, categories, searchable note lists, first-sentence titles, small copy icons on sidebar rows, and copy/export actions for the open note. |
-| Easy editing of recorded notes | Editable transcripts and titles with automatic saving. A note becomes editable when its recording and queued transcription finish. |
-| Long recordings and transcription | No application time limit. Audio is split at pauses or into chunks of up to 20 seconds, with overlap and timestamp-based deduplication. |
-| No WAVs retained; discard audio after transcription | No WAV files are created during recording. Temporary recovery PCM is stored in SQLite until its transcript is committed, then deleted in the same transaction. |
-| Reliability during many-minute sessions | Capture has its own writer thread and durable recovery journal. Saved chunks resume after interruption; failed chunks retain audio for retry. Recovery cannot restore samples that never reached disk. |
-| See transcription while recording, if practical | Completed sections arrive incrementally while capture continues. This is chunked transcription, not immediate word-by-word text; latency depends on speech pauses and inference speed. |
+- Local English transcription with Phonon-2 on Apple silicon Macs running macOS Sequoia 15 or later.
+- Recordings without an application duration limit, split into short chunks for transcription.
+- Incremental transcripts, a live waveform and microphone level display.
+- Workspaces, categories and searchable notes with automatic first-sentence titles.
+- Editable titles and completed transcripts, with automatic saving.
+- Clipboard copying, Markdown/text export, context menus and recoverable Trash.
+- Recovery of saved audio after interruption, with retry for failed transcription.
+- Automatic removal of temporary audio after its transcript is committed.
+- Read-only access to saved notes for scripts and LLM tools.
 
-Microphone-only capture is intentional for this first version. System audio and speaker diarization are outside its scope.
+System-audio capture and speaker diarization are not supported. Transcription accuracy varies with vocabulary, accents, microphone placement and background speech.
 
-## Use
+## Build and run
 
-Open `build/Fieldnotes.app` (or the installed app in Applications).
+Requires macOS Sequoia 15 or later on Apple silicon, Qt 6.9+, CMake 3.24+ and Python 3.12. Runtime dependencies are pinned in [requirements.txt](requirements.txt).
 
-- **Record a session** / **⌘R** starts a new note. The same button/shortcut stops it.
-- **Pause / Resume** / **⌘⇧P** pauses capture without losing the session.
-- Transcribed sections arrive during recording, normally after a pause once 2 seconds have accumulated, or every 20 seconds during continuous speech. This is incremental transcription, not a changing word-by-word hypothesis.
-- Notes take their title from the first transcript sentence. You can rename them manually; a manual name is preserved when text changes. Use the sidebar + buttons to create workspaces and categories. Move notes with the two dropdowns under the title. Search covers titles, categories and note text within the current workspace; note rows load in pages of 100.
-- Finished transcripts are directly editable. Title/text edits autosave after 750 ms without typing; switching notes or closing the app flushes pending edits immediately. While a note is recording or has active/pending transcription, its text stays read-only to protect it from concurrent changes; other notes remain editable.
-- **Copy** / **⌘⇧C** copies text without timestamps. Each sidebar note row also has a small copy icon that copies that note without opening it. The note menu offers copying with timestamps.
-- **Export** / **⌘E** saves Markdown or plain text with timestamps.
-- **⌘N** creates a text note. **⌘F** searches the open transcript; **⌘⇧F** searches the workspace. Use the arrows beside transcript search to move between highlighted matches.
-- Deleted notes go to **Trash**, with immediate undo and later restoration from the note menu.
-- Right-click a sidebar note to copy, rename, retry unfinished audio, move it to Trash, or restore it. The menu acts on that note without changing the open document unless you choose Rename. With a note row focused, **Delete / Backspace** moves it to Trash; **Shift+F10** opens its menu. You can also drag a finished note onto Trash. Recording/transcribing notes cannot be dragged to Trash.
-- Titles, transcripts and search fields have right-click editing menus for undo/redo, cut/copy/paste, deleting a selection and selecting all. Deleting text in an editor never deletes the note. Right-click a category or workspace picker for creation actions.
-
-The microphone permission is requested only on the first recording. Select an input device in the recording console. If denied, enable Fieldnotes in System Settings → Privacy & Security → Microphone.
-
-## Recording feedback and speech filtering
-
-A small tape reel beside the input meter rotates during capture and freezes when paused or inactive. A rolling four-second waveform and dBFS input level update from audio that has reached the recovery journal, independently of transcription. Copy confirms with an animated tick in a reserved space beside the button. Status messages and errors occupy a fixed strip and never change the document layout. Scroll views stop at their bounds without overshoot; the sidebar keeps its width when the window resizes.
-
-Silero VAD runs locally in the isolated inference process before Phonon-2. Only sustained speech spans above the minimum voice level are decoded; quiet/noise spans complete without transcript text and their recovery PCM is erased. Cropped speech retains its original timestamps. **Voice filter** adjusts the minimum level for new recordings (default −72 dBFS; adjustable down to −90 dBFS). Move towards Nearby voices to suppress faint background speech; towards Quiet voices if your own speech is being missed. This is a speech/volume gate, not speaker identification: loud background speech may still be transcribed, and no gate eliminates every recognition error. macOS Reduce Motion and the app's Reduce motion checkbox freeze the reel and remove tick scaling.
-
-Quiet inference input is raised for the speech detector and recogniser. The voice-level filter and input meter still use the original captured level, so inference gain does not bypass the filter. Short gaps between syllables stay within the same speech span to preserve opening words and decoding context.
-
-## Recovery and audio lifecycle
-
-There is no application recording-duration cap. Microphone capture is independent of model inference and the Qt UI. Captured PCM is journaled into a private SQLite database in roughly 250 ms blocks. Short chunks are cut at pauses or a 20 second limit, with a 750 ms overlap and word-timestamp deduplication at boundaries.
-
-No WAV files are created. **Temporary recovery PCM remains on disk until the corresponding transcript is successfully committed.** Transcript insertion, chunk completion, and audio deletion occur in one SQLite transaction. `synchronous=FULL`, macOS `fullfsync`, and `secure_delete` are enabled; DELETE journals avoid retaining deleted audio in a WAL file. The database can retain allocated space after deleting audio, but the deleted PCM pages are zeroed by SQLite. This is not a forensic-erasure guarantee for filesystem snapshots or storage hardware.
-
-Stop freezes capture feedback immediately and disables the control while the microphone closes. The audio journal drains before native device shutdown. If CoreAudio cannot close the device within eight seconds, the recording service restarts after saved audio is sealed; pending chunks resume automatically. Closing the app stops recording and flushes captured audio. A crash or forced termination recovers saved chunks on the next launch. An interrupted session is labeled as recovered. A transcription failure retains audio and exposes **Retry**. The app prevents idle sleep while recording and visibly stops if the input stalls or reports an overflow.
-
-Manual text edits are batched after a 750 ms typing pause. Normal note switches and app closure flush them immediately; forced termination can lose edits still within that debounce window. Audio journaling runs independently of this text-edit timer.
-
-Recovery cannot reconstruct samples that never reached storage: an abrupt backend/OS crash can lose the newest callback or uncommitted buffers (normally around a quarter-second, longer during a disk stall). Disk exhaustion, hardware failure, lid closure, or disconnecting the microphone can interrupt capture. An already saved transcript survives transcription failures. No artificial time limit does not mean unlimited disk space.
-
-Data: `~/Library/Application Support/Fieldnotes/notes.sqlite3`. Model diagnostics: `engine.log` in the same folder. Audio/transcripts are not logged. Setup downloads public dependencies; the first launch downloads the 164 MB model from its publisher if it is not cached. Recording and transcription use no network once the model is available. The native UI is small; the separate Python/MLX speech runtime and its dependencies are substantially larger.
-
-## Read notes from models and automation
-
-Use `./scripts/notes catalog` to discover workspaces/categories, then `./scripts/notes search --workspace Personal --category 'HCI tests' --text 'cursor' --all --format jsonl`. This standard-library-only reader opens SQLite read-only and returns full edited transcripts. It releases database locks before output, excludes Trash by default, and exposes incomplete-transcript flags. No audio or transcription runtime is loaded. The installed app bundles the reader too. See [read-only access](docs/READ_ONLY_ACCESS.md) for the schema, commands, and direct SQL view.
-
-## Build
-
-Dependencies: Qt 6.9+ (developed with Homebrew Qt 6.11), CMake 3.24+, Python 3.12, and the pinned runtime packages in `requirements.txt`.
+With Homebrew installed, set up dependencies and build:
 
 ```sh
 ./scripts/setup.sh
-```
-
-For an existing setup:
-
-```sh
-./scripts/build.sh
 open build/Fieldnotes.app
 ```
 
-The app bundles its Qt libraries and worker scripts. It references **this checkout's `.venv`** in `Contents/Resources/runtime.json`, so keep the checkout and virtual environment in place. It is a local development install, ad-hoc signed, not a notarized distributable. `FIELDNOTES_PYTHON` overrides the Python path; `FIELDNOTES_DATA_DIR` isolates data for testing.
+To rebuild an existing setup:
 
-## Verify
+```sh
+./scripts/build.sh
+```
 
-For native UI changes, also check title-bar dragging, resizing to the minimum
-window size, and copying a sidebar note while a different transcript is open.
-Sidebar copying should leave selection unchanged and show its tick in place.
+The app bundles Qt libraries and worker scripts, but references the checkout's `.venv` through `Contents/Resources/runtime.json`. Keep the checkout and virtual environment in place. Builds are ad-hoc signed development bundles, not notarized distributables.
+
+The model downloads on first launch if it is not cached. Recording and transcription run offline once the model is available. Microphone permission is requested on the first recording; permissions can be changed in System Settings → Privacy & Security → Microphone.
+
+`FIELDNOTES_PYTHON` overrides the runtime Python path. `FIELDNOTES_DATA_DIR` selects a separate data folder for testing.
+
+## Using Fieldnotes
+
+| Action | Shortcut |
+| --- | --- |
+| Start or stop recording | ⌘R |
+| Pause or resume recording | ⌘⇧P |
+| Create a text note | ⌘N |
+| Copy the open transcript without timestamps | ⌘⇧C |
+| Export the open note | ⌘E |
+| Search the open transcript | ⌘F |
+| Search the workspace | ⌘⇧F |
+
+Choose a microphone and recording destination in the recording pane. Transcribed sections appear after speech pauses or approximately every 20 seconds during continuous speech; latency depends on inference speed.
+
+Use the sidebar to create workspaces and categories. Notes are titled from their first transcript sentence unless manually renamed. The dropdowns below a note's title move it between workspaces and categories. Workspace search includes titles, categories and transcript text.
+
+Completed transcripts are editable. Text and title changes save after a 750 ms typing pause; switching notes or closing the app flushes pending edits. A transcript stays read-only while its recording or transcription is active.
+
+Each sidebar row has a copy icon. Right-click a note for copying, renaming, retrying unfinished transcription or moving it to Trash. A focused note row supports Delete/Backspace and Shift+F10; finished notes can also be dragged to Trash. Deleted notes can be restored through Undo or from Trash. Text editors provide standard right-click editing menus.
+
+Copy omits timestamps by default; the note menu offers copying with timestamps. Export preserves timestamps in Markdown or plain text.
+
+### Voice filter
+
+Silero VAD detects speech before transcription. The voice filter applies a minimum captured level, defaulting to −72 dBFS and adjustable down to −90 dBFS. Lower the threshold if quiet speech is missed; raise it to suppress distant voices. This filter does not identify speakers, so louder background speech may still be transcribed.
+
+Quiet audio is amplified for inference while the filter and input meter use the original captured level. Speech timestamps retain their positions within the recording. Reduce Motion settings disable the recording animation.
+
+## Storage and recovery
+
+Notes are stored in `~/Library/Application Support/Fieldnotes/notes.sqlite3`. Diagnostics are written to `engine.log` in the same folder; audio and transcripts are not logged.
+
+Captured PCM is journaled in roughly 250 ms blocks. Transcription chunks use a pause boundary or approximately 20 seconds of audio, with a 750 ms overlap and word-timestamp deduplication.
+
+No WAV files are created during recording. Temporary recovery audio remains in SQLite until its transcript is committed, then is deleted in the same transaction. Failed or interrupted chunks retain their audio for retry. SQLite uses `synchronous=FULL`, macOS `fullfsync` and `secure_delete`; this does not guarantee removal from filesystem snapshots or storage-device backups.
+
+Stop freezes recording feedback immediately while queued audio is saved and the microphone closes. If native device closure hangs, the service restarts after the journal is sealed and resumes pending transcription. Saved chunks also recover after a crash or forced termination.
+
+Recovery cannot restore audio that never reached storage. Abrupt failure can lose recent uncommitted buffers, and forced termination can lose text edits still inside the save debounce window. Available disk space and microphone/device failures can interrupt recording.
+
+## Read-only access
+
+The standard-library reader searches full saved transcripts without loading the audio or model runtime:
+
+```sh
+./scripts/notes catalog
+./scripts/notes search --workspace Personal --category 'HCI tests' --text 'cursor' --all --format jsonl
+```
+
+It opens the database read-only, excludes Trash by default and reports incomplete transcripts. The reader is also bundled in the app. See [read-only access](docs/READ_ONLY_ACCESS.md) for commands, output fields and the SQLite view.
+
+## Development and verification
+
+`src/` contains the C++ QtQuick bridge and platform integration; `qml/` contains the interface. `worker/backend.py` manages notes and recording, and `worker/recorder.py` writes the capture journal. A separate `worker/engine.py` process loads Phonon-2 and receives PCM through private pipes. No server port is opened.
+
+Run the native controller and Python tests after building:
 
 ```sh
 ctest --test-dir build --output-on-failure
 .venv/bin/python -m unittest discover -s tests -v
+```
+
+Optional integration checks exercise the capture journal and local model with synthesized speech:
+
+```sh
 .venv/bin/python scripts/validate_transcription.py
 .venv/bin/python scripts/validate_quiet_transcription.py
 ```
 
-The native controller tests verify edit batching after a 750 ms quiet period, combined title/body updates, immediate flushing on note switches and shutdown, immediate organisation changes, preservation of newer text when an older save acknowledgement arrives, and targeted Trash/Undo without changing another open note. The quiet-speech integration check uses the reported "Test, test, testing. This is a test voice note" phrase at −62 and −82 dBFS, through the real capture journal, 16/44.1 kHz resampling and local model, and checks word retention, timestamps and audio deletion.
+Coverage includes recording recovery, hung device closure, transactional audio deletion, chunk overlap, quiet-speech detection, edit batching, note organisation and read-only access. Integration checks verify long and quiet recordings, timestamps and audio cleanup. For UI changes, also check minimum-window sizing, title-bar dragging, recording feedback and sidebar actions without changing another open note.
 
-The unit suite tests process-crash recovery, transaction rollback, audio deletion, retry ordering, sample-aligned overlaps, journal-driven waveform telemetry, quiet/noise rejection through the actual engine protocol, faint/normal speech detection, legacy database migration, automatic/manual titles, workspaces/categories, paged search, persistent edits/trash, and a simulated three-minute recording. The opt-in integration check synthesizes over three minutes of speech with macOS `say`, passes it through the actual chunk writer and local model, checks repeated content survived, and verifies all temporary recovery audio was deleted. Its temporary audio and database are removed automatically.
+## License
 
-## Implementation
-
-`src/` is the native C++ QtQuick bridge; `qml/` is the notebook UI. `worker/backend.py` owns notes and recording; `worker/recorder.py` journals audio on its own thread. A separate `worker/engine.py` process loads Phonon-2 once and receives in-memory PCM through private pipes. There is no listening server port.
-
-Transcription is English only in this version. Phonon-2 is reasonably accurate on general English but technical names, accents, overlapping voices, and distant microphones still need review. Speaker diarization and system-audio capture are outside this version.
-
-Fieldnotes source is MIT licensed. See [THIRD_PARTY.md](THIRD_PARTY.md) for model/runtime attribution and licensing.
+Fieldnotes source is MIT licensed. See [THIRD_PARTY.md](THIRD_PARTY.md) for model and runtime attribution and licensing.

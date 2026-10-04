@@ -1,0 +1,3 @@
+#!/bin/sh
+# Standard-library reader: intentionally independent of the writable app backend.
+exec python3 "$(dirname "$0")/../worker/notes_reader.py" "$@"

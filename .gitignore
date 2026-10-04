@@ -1,0 +1,20 @@
+.venv/
+build/
+__pycache__/
+*.pyc
+.DS_Store
+test-artifacts/
+
+# Local settings, credentials, recordings, and recovery databases
+.env
+.env.*
+!.env.example
+*.sqlite3
+*.sqlite3-*
+*.db
+*.db-*
+*.wav
+*.aiff
+*.pcm
+*.log
+preferences.ini

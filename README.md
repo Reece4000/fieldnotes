@@ -27,7 +27,7 @@ Open `build/Fieldnotes.app` (or the installed app in Applications).
 - **Pause / Resume** / **⌘⇧P** pauses capture without losing the session.
 - Transcribed sections arrive during recording, normally after a pause once 2 seconds have accumulated, or every 20 seconds during continuous speech. This is incremental transcription, not a changing word-by-word hypothesis.
 - Notes take their title from the first transcript sentence. You can rename them manually; a manual name is preserved when text changes. Use the sidebar + buttons to create workspaces and categories. Move notes with the two dropdowns under the title. Search covers titles, categories and note text within the current workspace; note rows load in pages of 100.
-- Finished transcripts are directly editable and autosave. While a note is recording or has active/pending transcription, its text stays read-only to protect it from concurrent changes; other notes remain editable.
+- Finished transcripts are directly editable. Title/text edits autosave after 750 ms without typing; switching notes or closing the app flushes pending edits immediately. While a note is recording or has active/pending transcription, its text stays read-only to protect it from concurrent changes; other notes remain editable.
 - **Copy** / **⌘⇧C** copies text without timestamps. Each sidebar note row also has a small copy icon that copies that note without opening it. The note menu offers copying with timestamps.
 - **Export** / **⌘E** saves Markdown or plain text with timestamps.
 - **⌘N** creates a text note. **⌘F** searches the open transcript; **⌘⇧F** searches the workspace. Use the arrows beside transcript search to move between highlighted matches.
@@ -48,6 +48,8 @@ There is no application recording-duration cap. Microphone capture is independen
 No WAV files are created. **Temporary recovery PCM remains on disk until the corresponding transcript is successfully committed.** Transcript insertion, chunk completion, and audio deletion occur in one SQLite transaction. `synchronous=FULL`, macOS `fullfsync`, and `secure_delete` are enabled; DELETE journals avoid retaining deleted audio in a WAL file. The database can retain allocated space after deleting audio, but the deleted PCM pages are zeroed by SQLite. This is not a forensic-erasure guarantee for filesystem snapshots or storage hardware.
 
 Closing the app stops recording and flushes captured audio. A crash or forced termination recovers saved chunks on the next launch. An interrupted session is labeled as recovered. A transcription failure retains audio and exposes **Retry**. The app prevents idle sleep while recording and visibly stops if the input stalls or reports an overflow.
+
+Manual text edits are batched after a 750 ms typing pause. Normal note switches and app closure flush them immediately; forced termination can lose edits still within that debounce window. Audio journaling runs independently of this text-edit timer.
 
 Recovery cannot reconstruct samples that never reached storage: an abrupt backend/OS crash can lose the newest callback or uncommitted buffers (normally around a quarter-second, longer during a disk stall). Disk exhaustion, hardware failure, lid closure, or disconnecting the microphone can interrupt capture. An already saved transcript survives transcription failures. No artificial time limit does not mean unlimited disk space.
 
@@ -80,11 +82,13 @@ For native UI changes, also check title-bar dragging, resizing to the minimum
 window size, and copying a sidebar note while a different transcript is open.
 Sidebar copying should leave selection unchanged and show its tick in place.
 
-
 ```sh
+ctest --test-dir build --output-on-failure
 .venv/bin/python -m unittest discover -s tests -v
 .venv/bin/python scripts/validate_transcription.py
 ```
+
+The native controller tests verify edit batching after a 750 ms quiet period, combined title/body updates, immediate flushing on note switches and shutdown, immediate organisation changes, and preservation of newer text when an older save acknowledgement arrives.
 
 The unit suite tests process-crash recovery, transaction rollback, audio deletion, retry ordering, sample-aligned overlaps, journal-driven waveform telemetry, quiet/noise rejection through the actual engine protocol, faint/normal speech detection, legacy database migration, automatic/manual titles, workspaces/categories, paged search, persistent edits/trash, and a simulated three-minute recording. The opt-in integration check synthesizes over three minutes of speech with macOS `say`, passes it through the actual chunk writer and local model, checks repeated content survived, and verifies all temporary recovery audio was deleted. Its temporary audio and database are removed automatically.
 

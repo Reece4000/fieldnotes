@@ -19,6 +19,9 @@ QUrl Controller::settingsFile() const {
 }
 
 Controller::Controller(QObject *parent) : QObject(parent), m_process(new QProcess(this)) {
+    m_editTimer.setSingleShot(true);
+    m_editTimer.setInterval(750);
+    connect(&m_editTimer, &QTimer::timeout, this, &Controller::flushEdits);
     connect(m_process, &QProcess::readyReadStandardOutput, this, &Controller::receive);
     connect(m_process, &QProcess::readyReadStandardError, this, [this] {
         m_log.write(m_process->readAllStandardError());
@@ -167,10 +170,12 @@ void Controller::handle(const QJsonObject &event) {
 void Controller::refreshDocument() { send({{"action", "select"}, {"id", m_selected}}); }
 void Controller::selectNote(const QString &id) {
     if (id == m_selected) return;
+    flushEdits();
     m_selectionPending = id;
     send({{"action", "select"}, {"id", id}});
 }
 void Controller::newNote(const QString &collection, const QString &workspace) {
+    flushEdits();
     send({{"action", "new"}, {"collection", collection}, {"workspace", workspace}});
 }
 void Controller::query(const QString &workspace, const QString &collection, const QString &search, bool trash) {
@@ -195,6 +200,7 @@ void Controller::record(int device, const QString &collection, const QString &wo
     else setError("Microphone access is disabled. Enable Fieldnotes in System Settings → Privacy & Security → Microphone, then record again.");
 }
 void Controller::doRecord(int device, const QString &collection, const QString &workspace, double voiceDb) {
+    flushEdits();
     m_seconds = m_level = 0;
     m_db = -90; m_waveform.clear();
     emit meterChanged();
@@ -210,7 +216,22 @@ void Controller::updateField(const QString &key, const QString &value) {
     m_document.insert(key, value);
     m_edits[m_selected].insert(key, value);
     emit stateChanged();
-    send({{"action", "update"}, {"id", m_selected}, {key, value}});
+    m_pendingUpdates[m_selected].insert(key, value);
+    if (key == "body" || key == "title") m_editTimer.start();
+    else flushEdits();
+}
+void Controller::flushEdits() {
+    m_editTimer.stop();
+    // Keep acknowledgements in m_edits until the backend commits them.
+    // Capture each note's ID so switching notes cannot redirect a queued edit.
+    const auto updates = m_pendingUpdates;
+    m_pendingUpdates.clear();
+    for (auto it = updates.cbegin(); it != updates.cend(); ++it) {
+        auto command = QJsonObject::fromVariantMap(it.value());
+        command.insert("action", "update");
+        command.insert("id", it.key());
+        send(command);
+    }
 }
 void Controller::updateTitle(const QString &value) { updateField("title", value); }
 void Controller::updateCollection(const QString &value) { updateField("collection", value); }
@@ -242,6 +263,7 @@ void Controller::exportNote(const QUrl &url) {
 }
 void Controller::deleteNote() {
     if (m_selected.isEmpty()) return;
+    flushEdits();
     m_deleted = m_selected;
     m_deletionPending = m_selected;
     send({{"action", "delete"}, {"id", m_selected}});
@@ -258,6 +280,7 @@ QString Controller::clock(double value) const {
 }
 void Controller::shutdown() {
     if (m_closing) return;
+    flushEdits();
     m_closing = true;
     if (m_process->state() == QProcess::Running) {
         send({{"action", "shutdown"}});

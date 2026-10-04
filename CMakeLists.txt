@@ -15,6 +15,18 @@ set_target_properties(Fieldnotes PROPERTIES
   MACOSX_BUNDLE_GUI_IDENTIFIER "dev.reecemitchell.fieldnotes"
   MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_VERSION}")
 configure_file(src/runtime.json.in runtime.json @ONLY)
+include(CTest)
+if(BUILD_TESTING)
+  find_package(Qt6 REQUIRED COMPONENTS Test)
+  qt_add_executable(FieldnotesSaveTest tests/test_save_debounce.cpp src/controller.cpp src/controller.h src/note_model.cpp src/note_model.h)
+  target_include_directories(FieldnotesSaveTest PRIVATE src)
+  target_link_libraries(FieldnotesSaveTest PRIVATE Qt6::Core Qt6::Gui Qt6::Test)
+  set_target_properties(FieldnotesSaveTest PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tests/save/Contents/MacOS")
+  file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/tests/save/Contents/Resources/worker")
+  configure_file(tests/save_backend.py "${CMAKE_BINARY_DIR}/tests/save/Contents/Resources/worker/backend.py" COPYONLY)
+  configure_file(src/runtime.json.in "${CMAKE_BINARY_DIR}/tests/save/Contents/Resources/runtime.json" @ONLY)
+  add_test(NAME save_debounce COMMAND FieldnotesSaveTest)
+endif()
 add_custom_target(FieldnotesRuntime ALL DEPENDS Fieldnotes
   COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_BUNDLE_DIR:Fieldnotes>/Contents/Resources"
   COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_SOURCE_DIR}/worker" "$<TARGET_BUNDLE_DIR:Fieldnotes>/Contents/Resources/worker"

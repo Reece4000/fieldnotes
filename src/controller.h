@@ -5,6 +5,7 @@
 #include <QVariantList>
 #include <QFile>
 #include <QHash>
+#include <QTimer>
 #include "note_model.h"
 
 class Controller : public QObject {
@@ -116,6 +117,7 @@ private:
     void handle(const QJsonObject &event);
     void setError(const QString &value);
     void updateField(const QString &key, const QString &value);
+    void flushEdits();
     void doRecord(int device, const QString &collection, const QString &workspace, double voiceDb);
     void refreshDocument();
     QProcess *m_process;
@@ -126,6 +128,8 @@ private:
     int m_total = 0;
     QVariantMap m_document, m_capture;
     QHash<QString, QVariantMap> m_edits;
+    QHash<QString, QVariantMap> m_pendingUpdates;
+    QTimer m_editTimer;
     QString m_selected, m_active, m_engine = "loading", m_engineError, m_error, m_deleted, m_deletionPending, m_selectionPending;
     bool m_paused = false, m_connected = false, m_closing = false;
     double m_seconds = 0, m_level = 0, m_db = -90;

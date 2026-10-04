@@ -396,30 +396,37 @@ ApplicationWindow {
                         ActionButton { text: "↑"; padding: 4; implicitWidth: 28; implicitHeight: 28; quiet: true; enabled: !!transcriptSearch.text; Accessible.name: "Previous transcript match"; onClicked: window.findTranscript(true) }
                         ActionButton { text: "↓"; padding: 4; implicitWidth: 28; implicitHeight: 28; quiet: true; enabled: !!transcriptSearch.text; Accessible.name: "Next transcript match"; onClicked: window.findTranscript(false) }
                     }
-                    Flickable {
-                        id: transcriptView
-                        Layout.fillWidth: true; Layout.fillHeight: true; clip: true
-                        contentWidth: width; contentHeight: editor.height
-                        boundsBehavior: Flickable.StopAtBounds; boundsMovement: Flickable.StopAtBounds
-                        flickDeceleration: 5000; maximumFlickVelocity: 1400; acceptedButtons: Qt.NoButton
-                        ScrollBar.vertical: ScrollBar { }
-                        TextArea {
-                            id: editor
-                            width: transcriptView.width
-                            height: Math.max(transcriptView.height, implicitHeight)
-                            textFormat: TextEdit.PlainText; wrapMode: TextEdit.Wrap; selectByMouse: true
-                            readOnly: !window.c.editable; persistentSelection: true
-                            font.pixelSize: 14; color: "#47574d"; selectionColor: "#cddfba"; selectedTextColor: "#20331c"
-                            leftPadding: 0; rightPadding: 14; topPadding: 2; bottomPadding: 18
-                            placeholderTextColor: "#768377"
-                            placeholderText: !window.c.selectedId ? "Select a note or start recording."
-                                : window.c.noteStatus === "recording" || window.c.noteStatus === "paused" ? "Waiting for the first transcribed section…"
-                                : window.c.pending ? "Transcribing…" : "Write a note…"
-                            Accessible.name: "Note transcript"
-                            onTextChanged: if (!window.syncing && window.c.editable) window.c.updateBody(text)
-                            onCursorRectangleChanged: window.revealCursor()
-                            background: Rectangle { color: "transparent" }
+                    Item {
+                        Layout.fillWidth: true; Layout.fillHeight: true
+                        Flickable {
+                            id: transcriptView
+                            anchors.fill: parent; clip: true
+                            contentWidth: width; contentHeight: editor.height
+                            boundsBehavior: Flickable.StopAtBounds; boundsMovement: Flickable.StopAtBounds
+                            flickDeceleration: 5000; maximumFlickVelocity: 1400; acceptedButtons: Qt.NoButton
+                            ScrollBar.vertical: ScrollBar { }
+                            TextArea {
+                                id: editor
+                                width: transcriptView.width
+                                height: Math.max(transcriptView.height, implicitHeight)
+                                textFormat: TextEdit.PlainText; wrapMode: TextEdit.Wrap; selectByMouse: true
+                                readOnly: !window.c.editable; persistentSelection: true
+                                font.pixelSize: 14; color: "#47574d"; selectionColor: "#cddfba"; selectedTextColor: "#20331c"
+                                leftPadding: 0; rightPadding: 14; topPadding: 2; bottomPadding: 18
+                                placeholderTextColor: "#768377"
+                                placeholderText: !window.c.selectedId ? "Select a note or start recording."
+                                    : window.c.noteStatus === "recording" || window.c.noteStatus === "paused" ? "Waiting for the first transcribed section…"
+                                    : window.c.pending ? "Transcribing…" : "Write a note…"
+                                Accessible.name: "Note transcript"
+                                onTextChanged: if (!window.syncing && window.c.editable) window.c.updateBody(text)
+                                onCursorRectangleChanged: window.revealCursor()
+                                background: Rectangle { color: "transparent" }
+                            }
                         }
+                        // Fixed overlays mark the viewport edges without scrolling
+                        // with the document or taking space from the transcript.
+                        Rectangle { anchors.left: parent.left; anchors.right: parent.right; anchors.top: parent.top; height: 1; color: "#e5ebe2" }
+                        Rectangle { anchors.left: parent.left; anchors.right: parent.right; anchors.bottom: parent.bottom; height: 1; color: "#e5ebe2" }
                     }
                     Text { Layout.fillWidth: true; Layout.preferredHeight: 14; opacity: transcriptSearch.text ? 1 : 0; text: window.findPosition < 0 ? "No matches" : "Match highlighted"; color: "#6a7c70"; font.pixelSize: 10 }
                 }

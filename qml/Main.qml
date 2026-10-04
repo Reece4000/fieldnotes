@@ -311,64 +311,68 @@ ApplicationWindow {
             id: mainPane
             Layout.fillWidth: true; Layout.fillHeight: true
             Layout.margins: window.width < 1000 ? 16 : 24
-            Layout.topMargin: 16; Layout.bottomMargin: 16
+            Layout.topMargin: 12; Layout.bottomMargin: 16
             spacing: window.height < 760 ? 12 : 16
-            RowLayout {
-                Layout.fillWidth: true
-                Text { text: "SESSION NOTE"; font.pixelSize: 10; font.letterSpacing: 1.7; font.weight: Font.DemiBold; color: "#65796c" }
-                Item { Layout.fillWidth: true }
-                Rectangle { implicitWidth: 6; implicitHeight: 6; radius: 3; visible: !!window.c.selectedId; color: window.c.failed ? "#b44530" : "#669276" }
-                Text { text: !window.c.selectedId ? "" : window.c.trashed ? "In Trash" : window.c.saving ? "Saving…" : window.c.pending ? "Transcribing · " + window.c.pending : "Saved"; color: "#65796c"; font.pixelSize: 11 }
-                ActionButton {
-                    id: moreButton
-                    text: "…"; implicitHeight: 24; implicitWidth: 32; padding: 5; quiet: true; enabled: !!window.c.selectedId; Accessible.name: "More note actions"
-                    onClicked: noteMenu.popup(moreButton.width - noteMenu.width, moreButton.height + 4)
-                    FieldMenu {
-                        id: noteMenu
-                        FieldMenuItem { text: "Copy with timestamps"; enabled: !!window.c.body; onTriggered: window.c.copy(true) }
-                        FieldMenuItem { text: "Retry unfinished audio"; enabled: window.c.failed > 0 || window.c.engineStatus === "error"; onTriggered: window.c.retry() }
-                        FieldMenuItem { text: "Voice filter…"; onTriggered: filterDialog.open() }
-                        MenuSeparator { padding: 4; contentItem: Rectangle { implicitHeight: 1; color: "#dce2d4" } }
-                        FieldMenuItem { text: window.c.trashed ? "Restore note" : "Move note to trash"; enabled: window.c.editable || window.c.trashed; onTriggered: window.c.trashed ? window.c.restoreNote() : window.c.deleteNote() }
+            ColumnLayout {
+                Layout.fillWidth: true; spacing: 6
+                RowLayout {
+                    Layout.fillWidth: true; spacing: 10
+                    TextField {
+                        id: titleField
+                        Layout.fillWidth: true; implicitHeight: 34
+                        readOnly: window.c.trashed || !window.c.selectedId
+                        placeholderText: window.c.selectedId ? "Untitled note" : "Select a note"
+                        font.pixelSize: 24; font.weight: Font.DemiBold
+                        color: "#123b2b"; placeholderTextColor: "#6a7c70"; padding: 0; selectByMouse: true
+                        Accessible.name: "Note title"
+                        onTextEdited: if (!window.syncing) window.c.updateTitle(text)
+                        background: Rectangle { color: "transparent"; border.width: titleField.activeFocus ? 1 : 0; border.color: "#8da67d"; radius: 3 }
+                    }
+                    CopyButton { id: copyButton; implicitHeight: 32; enabled: !!window.c.body; reduceMotion: window.reducedMotion; onClicked: window.c.copy(); ToolTip.visible: hovered; ToolTip.text: "Copy without timestamps · ⌘⇧C" }
+                    ActionButton { text: "Export"; glyph: "export"; implicitHeight: 32; enabled: !!window.c.selectedId; onClicked: exportDialog.open() }
+                    ActionButton {
+                        id: moreButton
+                        text: "…"; implicitHeight: 28; implicitWidth: 28; padding: 4; quiet: true
+                        enabled: !!window.c.selectedId; Accessible.name: "More note actions"
+                        onClicked: noteMenu.popup(moreButton.width - noteMenu.width, moreButton.height + 4)
+                        FieldMenu {
+                            id: noteMenu
+                            FieldMenuItem { text: "Copy with timestamps"; enabled: !!window.c.body; onTriggered: window.c.copy(true) }
+                            FieldMenuItem { text: "Retry unfinished audio"; enabled: window.c.failed > 0 || window.c.engineStatus === "error"; onTriggered: window.c.retry() }
+                            FieldMenuItem { text: "Voice filter…"; onTriggered: filterDialog.open() }
+                            MenuSeparator { padding: 4; contentItem: Rectangle { implicitHeight: 1; color: "#dce2d4" } }
+                            FieldMenuItem { text: window.c.trashed ? "Restore note" : "Move note to trash"; enabled: window.c.editable || window.c.trashed; onTriggered: window.c.trashed ? window.c.restoreNote() : window.c.deleteNote() }
+                        }
                     }
                 }
-            }
-            RowLayout {
-                Layout.fillWidth: true; spacing: 12
-                TextField {
-                    id: titleField
-                    Layout.fillWidth: true; implicitHeight: 42
-                    readOnly: window.c.trashed || !window.c.selectedId
-                    placeholderText: window.c.selectedId ? "Untitled note" : "Select a note"
-                    font.pixelSize: window.width < 1000 ? 24 : 35; font.weight: Font.DemiBold
-                    color: "#123b2b"; placeholderTextColor: "#6a7c70"; padding: 0; selectByMouse: true
-                    Accessible.name: "Note title"
-                    onTextEdited: if (!window.syncing) window.c.updateTitle(text)
-                    background: Rectangle { color: "transparent"; border.width: titleField.activeFocus ? 1 : 0; border.color: "#8da67d"; radius: 3 }
+                RowLayout {
+                    Layout.fillWidth: true; spacing: 8
+                    FieldCombo {
+                        Layout.preferredWidth: Math.min(160, mainPane.width / 3); glyph: window.width < 1000 ? "" : "folder"; implicitHeight: 28
+                        enabled: !!window.c.selectedId && !window.c.trashed
+                        model: window.c.workspaces; textRole: "name"
+                        currentIndex: Math.max(0, window.c.workspaces.findIndex(n => n.id === window.c.workspace))
+                        Accessible.name: "Note workspace"
+                        onActivated: window.c.updateWorkspace(model[currentIndex].id)
+                    }
+                    FieldCombo {
+                        Layout.preferredWidth: Math.min(160, mainPane.width / 3); glyph: window.width < 1000 ? "" : /hci|test/i.test(window.c.collection) ? "flask" : "folder"; implicitHeight: 28
+                        enabled: !!window.c.selectedId && !window.c.trashed
+                        model: window.noteCategories; textRole: "name"
+                        currentIndex: Math.max(0, window.noteCategories.findIndex(n => n.value === window.c.collection))
+                        Accessible.name: "Note category"
+                        onActivated: window.c.updateCollection(model[currentIndex].value)
+                    }
+                    Item { Layout.fillWidth: true }
+                    Rectangle { implicitWidth: 5; implicitHeight: 5; radius: 3; visible: !!window.c.selectedId; color: window.c.failed ? "#b44530" : "#669276" }
+                    Text {
+                        text: !window.c.selectedId ? "" : window.c.trashed ? "In Trash" : window.c.saving ? "Saving…" : window.c.pending ? "Transcribing · " + window.c.pending : "Saved"
+                        color: "#65796c"; font.pixelSize: 10
+                        ToolTip.visible: saveHover.hovered && window.c.updated > 0
+                        ToolTip.text: "Edited " + Qt.formatDateTime(new Date(window.c.updated * 1000), "dd MMM, HH:mm")
+                        HoverHandler { id: saveHover }
+                    }
                 }
-                CopyButton { id: copyButton; enabled: !!window.c.body; reduceMotion: window.reducedMotion; onClicked: window.c.copy(); ToolTip.visible: hovered; ToolTip.text: "Copy without timestamps · ⌘⇧C" }
-                ActionButton { text: "Export"; glyph: "export"; enabled: !!window.c.selectedId; onClicked: exportDialog.open() }
-            }
-            RowLayout {
-                Layout.fillWidth: true; spacing: 8
-                FieldCombo {
-                    Layout.preferredWidth: Math.min(184, mainPane.width / 3); glyph: window.width < 1000 ? "" : "folder"; implicitHeight: 36
-                    enabled: !!window.c.selectedId && !window.c.trashed
-                    model: window.c.workspaces; textRole: "name"
-                    currentIndex: Math.max(0, window.c.workspaces.findIndex(n => n.id === window.c.workspace))
-                    Accessible.name: "Note workspace"
-                    onActivated: window.c.updateWorkspace(model[currentIndex].id)
-                }
-                FieldCombo {
-                    Layout.preferredWidth: Math.min(184, mainPane.width / 3); glyph: window.width < 1000 ? "" : /hci|test/i.test(window.c.collection) ? "flask" : "folder"; implicitHeight: 36
-                    enabled: !!window.c.selectedId && !window.c.trashed
-                    model: window.noteCategories; textRole: "name"
-                    currentIndex: Math.max(0, window.noteCategories.findIndex(n => n.value === window.c.collection))
-                    Accessible.name: "Note category"
-                    onActivated: window.c.updateCollection(model[currentIndex].value)
-                }
-                Item { Layout.fillWidth: true }
-                Text { visible: window.width >= 1100 && window.c.updated > 0; text: "Edited " + Qt.formatDateTime(new Date(window.c.updated * 1000), "dd MMM, HH:mm"); color: "#718074"; font.pixelSize: 11 }
             }
             Surface {
                 Layout.fillWidth: true; Layout.fillHeight: true; Layout.minimumHeight: 146

@@ -4,7 +4,8 @@ Fieldnotes is a QtQuick desktop app for recording spoken notes and transcribing 
 
 The project focuses on reliable long-form capture, editable transcripts and organised notes. Microphone capture runs independently of the interface and transcription engine, with audio saved to a recovery journal as it arrives.
 
-<img width="1197" height="841" alt="image" src="https://github.com/user-attachments/assets/2c5d080b-26fa-4e3e-8c8f-dac7af5716d5" />
+<img width="1300" height="942" alt="image" src="https://github.com/user-attachments/assets/888f19de-b747-4eb2-9297-75c663bb7761" />
+
 
 ## Features
 

@@ -48,7 +48,7 @@ In each theme, the theme's track 4 is the amber role and track 2 the magenta rol
 
 The colour meanings:
 
-- **Accent (turquoise in instrument):** where the cursor is. A focused field or row floods with the accent and its ink turns to the accent's own ink. The note text is bare content, so it gets an accent frame instead.
+- **Accent (turquoise in instrument):** where the cursor is. A focused field or row floods with the accent and its ink turns to the accent's own ink. The note text is bare content and gets no frame; the write (or preview) tab floods while the text holds the cursor.
 - **Amber:** transcription work still to do (pending audio, the model loading).
 - **Magenta:** something failed and needs you: needs retry, errors, the top of the level meter.
 - **Red:** recording, and nothing else. The rec key floods red while recording.

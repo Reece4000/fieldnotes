@@ -32,6 +32,7 @@ Controller::Controller(QObject *parent) : QObject(parent), m_process(new QProces
     });
     connect(m_process, qOverload<int, QProcess::ExitStatus>(&QProcess::finished), this, [this](int, QProcess::ExitStatus) {
         m_connected = false;
+        m_moving = false;
         m_active.clear();
         m_stopping = false;
         emit stateChanged();
@@ -99,6 +100,11 @@ void Controller::handle(const QJsonObject &event) {
         const bool first = !m_connected;
         m_connected = true;
         m_notes = event.value("notes").toArray().toVariantList();
+        QStringList visibleIds;
+        for (const auto &note : m_notes) visibleIds.append(note.toMap().value("id").toString());
+        const auto previousSelection = m_selectedNoteIds;
+        m_selectedNoteIds.removeIf([&visibleIds](const QString &id) { return !visibleIds.contains(id); });
+        if (previousSelection != m_selectedNoteIds) emit noteSelectionChanged();
         m_noteModel.setNotes(m_notes);
         m_workspaces = event.value("workspaces").toArray().toVariantList();
         m_categories = event.value("categories").toArray().toVariantList();
@@ -176,6 +182,13 @@ void Controller::handle(const QJsonObject &event) {
         emit workspaceCreated(event.value("id").toString());
     } else if (type == "category") {
         emit categoryCreated(event.value("name").toString());
+    } else if (type == "category_changed") {
+        emit categoryChanged(event.value("message").toString());
+    } else if (type == "moved") {
+        m_moving = false;
+        clearNoteSelection();
+        emit stateChanged();
+        emit notesMoved(event.value("count").toInt(), event.value("collection").toString());
     } else if (type == "deleted") {
         m_deleted = event.value("id").toString();
         // The selected-note state below also chooses a replacement document.
@@ -188,7 +201,59 @@ void Controller::handle(const QJsonObject &event) {
         text.remove(QRegularExpression("\\[\\d{2,}:\\d{2}:\\d{2}\\] ?"));
         QGuiApplication::clipboard()->setText(text);
         emit noteCopied(event.value("id").toString());
-    } else if (type == "error") setError(event.value("message").toString());
+    } else if (type == "error") {
+        m_moving = false;
+        emit stateChanged();
+        setError(event.value("message").toString());
+    }
+}
+void Controller::clearNoteSelection() {
+    m_selectionAnchor.clear();
+    if (m_selectedNoteIds.isEmpty()) return;
+    m_selectedNoteIds.clear();
+    emit noteSelectionChanged();
+}
+void Controller::selectNoteRow(const QString &id, bool toggle, bool extend) {
+    QStringList ids;
+    for (const auto &note : m_notes) ids.append(note.toMap().value("id").toString());
+    const int row = ids.indexOf(id), anchor = ids.indexOf(m_selectionAnchor);
+    if (row < 0) return;
+    if (extend && anchor >= 0) {
+        if (!toggle) m_selectedNoteIds.clear();
+        for (int i = qMin(row, anchor); i <= qMax(row, anchor); ++i)
+            if (!m_selectedNoteIds.contains(ids[i])) m_selectedNoteIds.append(ids[i]);
+    } else if (toggle) {
+        if (m_selectedNoteIds.contains(id)) m_selectedNoteIds.removeAll(id);
+        else m_selectedNoteIds.append(id);
+        m_selectionAnchor = id;
+    } else {
+        m_selectedNoteIds = {id};
+        m_selectionAnchor = id;
+    }
+    emit noteSelectionChanged();
+    if (!toggle && !extend) selectNote(id);
+}
+void Controller::selectAllNotes() {
+    m_selectedNoteIds.clear();
+    for (const auto &note : m_notes) m_selectedNoteIds.append(note.toMap().value("id").toString());
+    m_selectionAnchor = m_selectedNoteIds.value(0);
+    emit noteSelectionChanged();
+}
+void Controller::selectNotes(const QStringList &ids) {
+    m_selectedNoteIds.clear();
+    for (const auto &note : m_notes) {
+        const auto id = note.toMap().value("id").toString();
+        if (ids.contains(id)) m_selectedNoteIds.append(id);
+    }
+    m_selectionAnchor = m_selectedNoteIds.value(0);
+    emit noteSelectionChanged();
+}
+void Controller::moveNotes(const QStringList &ids, const QString &workspace, const QString &collection) {
+    if (!m_connected || m_moving || ids.isEmpty()) return;
+    flushEdits();
+    m_moving = true;
+    emit stateChanged();
+    send({{"action", "move"}, {"ids", QJsonArray::fromStringList(ids)}, {"workspace", workspace}, {"collection", collection}});
 }
 void Controller::refreshDocument() { send({{"action", "select"}, {"id", m_selected}}); }
 void Controller::selectNote(const QString &id) {
@@ -201,14 +266,18 @@ void Controller::newNote(const QString &collection, const QString &workspace) {
     flushEdits();
     send({{"action", "new"}, {"collection", collection}, {"workspace", workspace}});
 }
-void Controller::query(const QString &workspace, const QString &collection, const QString &search, bool trash) {
-    QJsonObject command{{"action", "query"}, {"workspace", workspace}, {"search", search}, {"trash", trash}};
+void Controller::query(const QString &workspace, const QString &collection, const QString &search, bool trash, bool all) {
+    clearNoteSelection();
+    QJsonObject command{{"action", "query"}, {"workspace", workspace}, {"search", search}, {"trash", trash}, {"all", all}};
     if (collection != "*") command.insert("collection", collection);
     send(command);
 }
 void Controller::loadMore() { send({{"action", "more"}}); }
 void Controller::createWorkspace(const QString &name) { send({{"action", "workspace"}, {"name", name}}); }
 void Controller::createCategory(const QString &workspace, const QString &name) { send({{"action", "category"}, {"workspace", workspace}, {"name", name}}); }
+void Controller::renameCategory(const QString &workspace, const QString &name, const QString &replacement) { flushEdits(); send({{"action", "rename_category"}, {"workspace", workspace}, {"name", name}, {"replacement", replacement}}); }
+void Controller::removeCategory(const QString &workspace, const QString &name) { flushEdits(); send({{"action", "remove_category"}, {"workspace", workspace}, {"name", name}}); }
+void Controller::reorderCategories(const QString &workspace, const QStringList &names) { send({{"action", "reorder_categories"}, {"workspace", workspace}, {"names", QJsonArray::fromStringList(names)}}); }
 void Controller::updateWorkspace(const QString &value) { updateField("workspace", value); }
 void Controller::record(int device, const QString &collection, const QString &workspace, double voiceDb) {
     if (recording()) return;

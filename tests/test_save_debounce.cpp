@@ -1,6 +1,7 @@
 #include "controller.h"
 #include <QElapsedTimer>
 #include <QJsonDocument>
+#include <QJsonArray>
 #include <QTemporaryDir>
 #include <QtTest>
 #include <memory>
@@ -82,6 +83,43 @@ private slots:
         QCOMPARE(controller->body(), QString("Original second"));
         controller->selectNote("first");
         QTRY_COMPARE_WITH_TIMEOUT(controller->body(), QString("Pending first note"), 2000);
+    }
+    void noteSelectionSupportsToggleRangeAndQueryReset() {
+        controller->selectNoteRow("first");
+        controller->selectNoteRow("second", true);
+        QCOMPARE(controller->selectedNoteIds(), QStringList({"first", "second"}));
+        QCOMPARE(controller->selectedId(), QString("first"));
+        controller->selectNoteRow("first", true);
+        QCOMPARE(controller->selectedNoteIds(), QStringList({"second"}));
+        controller->selectNoteRow("second", false, true);
+        QCOMPARE(controller->selectedNoteIds(), QStringList({"first", "second"}));
+        controller->query("inbox", "*", "search");
+        QVERIFY(controller->selectedNoteIds().isEmpty());
+        controller->selectAllNotes();
+        QCOMPARE(controller->selectedNoteIds().size(), 2);
+        controller->trashNote("second");
+        QTRY_COMPARE_WITH_TIMEOUT(controller->selectedNoteIds(), QStringList({"first"}), 2000);
+    }
+    void bulkMoveFlushesEditsBeforeMovingAndClearsSelectionAfterAcknowledgement() {
+        QSignalSpy moved(controller.get(), &Controller::notesMoved);
+        controller->selectAllNotes();
+        controller->updateBody("Text just typed before move");
+        controller->moveNotes(controller->selectedNoteIds(), "inbox", "Research");
+        QVERIFY(controller->moving());
+        QTRY_COMPARE_WITH_TIMEOUT(moved.count(), 1, 2000);
+        QVERIFY(!controller->moving());
+        QVERIFY(controller->selectedNoteIds().isEmpty());
+        QCOMPARE(controller->selectedId(), QString("first"));
+        QCOMPARE(controller->body(), QString("Text just typed before move"));
+        QCOMPARE(controller->collection(), QString("Research"));
+        const auto all = commands();
+        int update = -1, move = -1;
+        for (int i = 0; i < all.size(); ++i) {
+            if (all[i].value("action") == "update") update = i;
+            if (all[i].value("action") == "move") move = i;
+        }
+        QVERIFY(update >= 0 && move > update);
+        QCOMPARE(all[move].value("ids").toArray().size(), 2);
     }
     void closingFlushesBeforeShutdown() {
         controller->updateBody("Last keystroke before quitting");

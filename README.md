@@ -10,7 +10,8 @@ The project focuses on reliable long-form capture, editable transcripts and orga
 - Recordings without an application duration limit, split into short chunks for transcription.
 - Incremental transcripts, a live waveform and microphone level display.
 - Workspaces, categories and searchable notes with automatic first-sentence titles.
-- Editable titles and completed transcripts, with automatic saving.
+- A dedicated Organise view with previews, drag-and-drop filing, bulk moves and an editor drawer.
+- A custom Markdown notes editor with formatting tools, a preview toggle, focused writing and automatic saving.
 - Clipboard copying, Markdown/text export, context menus and recoverable Trash.
 - Recovery of saved audio after interruption, with retry for failed transcription.
 - Automatic removal of temporary audio after its transcript is committed.
@@ -37,6 +38,8 @@ To rebuild an existing setup:
 
 The app bundles Qt libraries and worker scripts, but references the checkout's `.venv` through `Contents/Resources/runtime.json`. Keep the checkout and virtual environment in place. Builds are ad-hoc signed development bundles, not notarized distributables.
 
+Use `scripts/build.sh` for runnable bundles: after linking, Qt's deployment step must refresh the executable's library paths before signing. A bare `cmake --build build` can leave a previously packaged app loading both bundled and Homebrew Qt libraries. The build script verifies the signature and briefly launches the finished app with temporary test data to catch packaging failures. Run that launch check separately with `python3 scripts/check_app.py`.
+
 The model downloads on first launch if it is not cached. Recording and transcription run offline once the model is available. Microphone permission is requested on the first recording; permissions can be changed in System Settings → Privacy & Security → Microphone.
 
 `FIELDNOTES_PYTHON` overrides the runtime Python path. `FIELDNOTES_DATA_DIR` selects a separate data folder for testing.
@@ -50,18 +53,26 @@ The model downloads on first launch if it is not cached. Recording and transcrip
 | Create a text note | ⌘N |
 | Copy the open transcript without timestamps | ⌘⇧C |
 | Export the open note | ⌘E |
-| Search the open transcript | ⌘F |
+| Find in the open note | ⌘F |
+| Bold / italic / insert link in the editor | ⌘B / ⌘I / ⌘K |
+| Toggle Write / Markdown preview while editing | ⌘⇧M |
 | Search the workspace | ⌘⇧F |
 
 Choose a microphone and recording destination in the recording pane. Transcribed sections appear after speech pauses or approximately every 20 seconds during continuous speech; latency depends on inference speed.
 
-Use the sidebar to create workspaces and categories. Notes are titled from their first transcript sentence unless manually renamed. The dropdowns below a note's title move it between workspaces and categories. Workspace search includes titles, categories and transcript text.
+Use the sidebar to create workspaces and categories. Notes are titled from their first transcript sentence unless manually renamed. Click the workspace / category location beside a note's title to move it; the popover labels both levels. Workspace search includes titles, categories and transcript text.
+
+Click **Select** above the sidebar notes to choose several notes, then **Move…** to file them together. You can also use ⌘-click to toggle notes, Shift-click to select a range, or ⌘A while the note list has focus. Right-click any note for **Move to category…**. Selection clears when changing workspace, category or search; the sidebar's Select all applies to loaded notes and labels that limit when more are available.
+
+Open **Organise** for a full collection view, including notes beyond the sidebar's first page. The workspace picker is labelled explicitly; categories stay in a separate sidebar while the notes scroll. Click a category to filter, or drag a note or selected group onto it to move them. Click a note to open its editor. Use **Select**, ⌘-click or Shift-click for multi-selection, then **Move…** or drag to a category. Search full transcripts and use **View** for sorting and filters. Category menus offer rename, reorder and remove; removing a category makes its notes Unfiled, including notes in Trash, without deleting them. Recording can continue while organising, with a Stop recording button available.
+
+Click **New text note** (⌘N) to type a note in the focused writing view. The **Write** tab keeps the original Markdown source; **Preview** renders headings, emphasis, lists, task lists, links, tables and code blocks without modifying the saved text. The formatting toolbar includes bold, italic, headings, lists and links, with every option also available under **Format** in compact windows. Formatting supports undo/redo; the editor also includes Find and a word count. The same editor is available in the Organise drawer. **Recorder** returns the recording controls, and an active recording keeps Pause and Stop available while writing.
 
 Completed transcripts are editable. Text and title changes save after a 750 ms typing pause; switching notes or closing the app flushes pending edits. A transcript stays read-only while its recording or transcription is active.
 
 Each sidebar row has a copy icon. Right-click a note for copying, renaming, retrying unfinished transcription or moving it to Trash. A focused note row supports Delete/Backspace and Shift+F10; finished notes can also be dragged to Trash. Deleted notes can be restored through Undo or from Trash. Text editors provide standard right-click editing menus.
 
-Copy omits timestamps by default; the note menu offers copying with timestamps. Export preserves timestamps in Markdown or plain text.
+Copy omits timestamps by default; the note menu offers copying with timestamps. Export (in the note’s More menu, or ⌘E) preserves timestamps in Markdown or plain text.
 
 ### Voice filter
 

@@ -162,7 +162,7 @@ ColumnLayout {
         Text {
             Layout.leftMargin: 10; Layout.rightMargin: 6
             text: !searchField.text ? "" : root.findPosition < 0 ? "none" : "found"
-            font.family: T.mono; font.pixelSize: T.value; color: root.findPosition < 0 ? T.muted : T.ink
+            font.family: T.mono; font.pixelSize: T.value; color: root.findPosition < 0 ? T.p.muted : T.p.ink
         }
         ActionButton { text: "↑"; implicitWidth: 28; quiet: true; Accessible.name: "Previous match"; enabled: !!searchField.text; onClicked: root.find(true) }
         ActionButton { text: "↓"; implicitWidth: 28; quiet: true; Accessible.name: "Next match"; enabled: !!searchField.text; onClicked: root.find(false) }
@@ -174,7 +174,7 @@ ColumnLayout {
         Rectangle {
             anchors.fill: parent; anchors.leftMargin: -12; anchors.rightMargin: -2
             color: "transparent"; border.width: 1
-            border.color: source.activeFocus || rendered.activeFocus ? T.accent : "transparent"
+            border.color: source.activeFocus || rendered.activeFocus ? T.p.accent : "transparent"
         }
         Flickable {
             id: sourceView
@@ -188,8 +188,8 @@ ColumnLayout {
                 id: source
                 width: sourceView.width; height: Math.max(sourceView.height, implicitHeight)
                 textFormat: TextEdit.PlainText; wrapMode: TextEdit.Wrap; selectByMouse: true; persistentSelection: true
-                readOnly: root.readOnly; font.family: T.sans; font.pixelSize: 15; color: T.ink
-                selectionColor: T.alpha(T.accent, .38); selectedTextColor: T.ink; placeholderTextColor: T.muted
+                readOnly: root.readOnly; font.family: T.sans; font.pixelSize: 15; color: T.p.ink
+                selectionColor: T.alpha(T.p.accent, .38); selectedTextColor: T.p.ink; placeholderTextColor: T.p.muted
                 leftPadding: 0; rightPadding: 14; topPadding: 10; bottomPadding: 24
                 placeholderText: T.lower(root.placeholderText); Accessible.name: root.accessibleName
                 onTextChanged: if (!root.syncing && !root.readOnly) root.edited(text)
@@ -212,10 +212,10 @@ ColumnLayout {
                 width: previewView.width; height: Math.max(previewView.height, implicitHeight)
                 text: root.preview ? root.text : ""
                 textFormat: TextEdit.MarkdownText; readOnly: true; selectByMouse: true; wrapMode: TextEdit.Wrap
-                font.family: T.sans; font.pixelSize: 15; color: T.ink
-                selectionColor: T.alpha(T.accent, .38); selectedTextColor: T.ink
+                font.family: T.sans; font.pixelSize: 15; color: T.p.ink
+                selectionColor: T.alpha(T.p.accent, .38); selectedTextColor: T.p.ink
                 leftPadding: 0; rightPadding: 14; topPadding: 10; bottomPadding: 24
-                placeholderText: "nothing to preview"; placeholderTextColor: T.muted
+                placeholderText: "nothing to preview"; placeholderTextColor: T.p.muted
                 Accessible.name: "Markdown preview"
                 onLinkActivated: link => { if (/^https?:\/\//i.test(link) || /^mailto:/i.test(link)) Qt.openUrlExternally(link) }
                 background: Item { }
@@ -225,11 +225,11 @@ ColumnLayout {
     }
     RowLayout {
         Layout.fillWidth: true; Layout.preferredHeight: 20; spacing: 6
-        Text { text: "words"; font.family: T.sans; font.pixelSize: 12; color: T.muted }
-        Text { text: root.wordCount; font.family: T.mono; font.pixelSize: T.value; color: T.ink }
+        Text { text: "words"; font.family: T.sans; font.pixelSize: 12; color: T.p.muted }
+        Text { text: root.wordCount; font.family: T.mono; font.pixelSize: T.value; color: T.p.ink }
         Item { Layout.fillWidth: true }
         Rectangle { visible: root.statusColour.a > 0 && !!root.statusText; Layout.preferredWidth: 6; Layout.preferredHeight: 6; color: root.statusColour }
-        Text { text: T.lower(root.statusText || (root.preview ? "preview" : root.readOnly ? "read only" : "markdown")); font.family: T.mono; font.pixelSize: T.value; color: T.muted }
+        Text { text: T.lower(root.statusText || (root.preview ? "preview" : root.readOnly ? "read only" : "markdown")); font.family: T.mono; font.pixelSize: T.value; color: T.p.muted }
     }
     Shortcut { sequence: "Meta+B"; enabled: source.activeFocus && !root.readOnly && !root.preview; onActivated: root.wrap("**", "**", "bold text") }
     Shortcut { sequence: "Meta+I"; enabled: source.activeFocus && !root.readOnly && !root.preview; onActivated: root.wrap("*", "*", "italic text") }

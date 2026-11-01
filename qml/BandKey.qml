@@ -9,7 +9,7 @@ Button {
     property string keys: ""
     property color flood: "transparent"
     readonly property bool flooded: flood.a > 0
-    readonly property color legendColour: control.visualFocus || control.flooded ? T.floodInk : control.enabled ? T.bandInk : T.bandMuted
+    readonly property color legendColour: control.visualFocus || control.flooded ? T.p.floodInk : control.enabled ? T.p.bandInk : T.p.bandMuted
     hoverEnabled: true
     padding: 10
     font.family: T.sans; font.pixelSize: T.label
@@ -27,10 +27,10 @@ Button {
         }
     }
     background: Rectangle {
-        color: control.visualFocus ? T.accent
+        color: control.visualFocus ? T.p.accent
              : control.flooded ? (control.down ? Qt.darker(control.flood, 1.15) : control.flood)
-             : !control.enabled ? T.alpha(T.bandKey, .45)
-             : control.down ? T.bandInk
-             : control.hovered ? Qt.lighter(T.bandKey, 1.06) : T.bandKey
+             : !control.enabled ? T.alpha(T.p.bandKey, .45)
+             : control.down ? T.p.bandInk
+             : control.hovered ? Qt.lighter(T.p.bandKey, 1.06) : T.p.bandKey
     }
 }

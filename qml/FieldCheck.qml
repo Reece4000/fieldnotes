@@ -12,13 +12,13 @@ CheckBox {
     indicator: Rectangle {
         x: control.leftPadding; y: (control.height - height) / 2
         implicitWidth: 10; implicitHeight: 10
-        color: control.visualFocus ? T.accent : control.checked ? (control.onBand ? T.bandInk : T.ink) : "transparent"
+        color: control.visualFocus ? T.p.accent : control.checked ? (control.onBand ? T.p.bandInk : T.p.ink) : "transparent"
         border.width: control.checked || control.visualFocus ? 0 : 1
-        border.color: control.onBand ? T.bandMuted : T.muted
+        border.color: control.onBand ? T.p.bandMuted : T.p.muted
     }
     contentItem: Text {
         text: T.lower(control.text); font: control.font
-        color: control.onBand ? T.bandInk : control.checked ? T.ink : T.muted
+        color: control.onBand ? T.p.bandInk : control.checked ? T.p.ink : T.p.muted
         leftPadding: control.text ? control.indicator.width + control.spacing : 0
         verticalAlignment: Text.AlignVCenter
     }

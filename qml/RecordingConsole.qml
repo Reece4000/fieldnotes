@@ -29,7 +29,7 @@ Rectangle {
     signal destinationCategoryChosen(string category)
     signal voiceDbChosen(double value)
     signal filterRequested()
-    color: T.band
+    color: T.p.band
     implicitHeight: compact ? 120 : 152
 
     RowLayout {
@@ -52,13 +52,13 @@ Rectangle {
                 Layout.fillWidth: true; Layout.preferredHeight: 18; spacing: 8
                 Rectangle {
                     Layout.preferredWidth: 8; Layout.preferredHeight: 8
-                    color: recorderConsole.controller.recording ? T.record : recorderConsole.controller.connected ? T.bandInk : T.amber
+                    color: recorderConsole.controller.recording ? T.p.record : recorderConsole.controller.connected ? T.p.bandInk : T.p.amber
                     opacity: recorderConsole.controller.paused ? .45 : 1
                 }
                 Text {
                     Layout.fillWidth: true; elide: Text.ElideRight
                     text: recorderConsole.controller.stopping ? "stopping" : recorderConsole.capturing ? recorderConsole.controller.paused ? "paused" : "recording" : recorderConsole.controller.connected ? "ready" : "connecting"
-                    font.family: T.mono; font.pixelSize: T.value; color: T.bandInk
+                    font.family: T.mono; font.pixelSize: T.value; color: T.p.bandInk
                 }
             }
         }
@@ -71,7 +71,7 @@ Rectangle {
                 width: recorderConsole.inner; height: recorderConsole.inner
                 keys: "⌘R"
                 text: recorderConsole.controller.stopping ? "stopping" : recorderConsole.capturing ? "stop" : "rec"
-                flood: recorderConsole.controller.recording ? T.record : "transparent"
+                flood: recorderConsole.controller.recording ? T.p.record : "transparent"
                 enabled: recorderConsole.controller.connected && !recorderConsole.controller.stopping
                 Accessible.name: recorderConsole.controller.stopping ? "Stopping recording" : recorderConsole.capturing ? "Stop recording" : "Start recording"
                 onClicked: recorderConsole.recordRequested()
@@ -91,13 +91,13 @@ Rectangle {
             spacing: 6
             RowLayout {
                 Layout.fillWidth: true; Layout.preferredHeight: 18
-                Text { text: "level"; font.family: T.sans; font.pixelSize: T.label; color: T.bandInk }
+                Text { text: "level"; font.family: T.sans; font.pixelSize: T.label; color: T.p.bandInk }
                 Item { Layout.fillWidth: true }
                 Text {
                     text: recorderConsole.capturing && !recorderConsole.controller.paused ? Math.round(recorderConsole.controller.decibels) : "—"
-                    font.family: T.mono; font.pixelSize: T.value; color: T.bandMuted
+                    font.family: T.mono; font.pixelSize: T.value; color: T.p.bandMuted
                 }
-                Text { text: "dBFS"; font.family: T.mono; font.pixelSize: T.small; color: T.bandMuted }
+                Text { text: "dBFS"; font.family: T.mono; font.pixelSize: T.small; color: T.p.bandMuted }
             }
             Waveform {
                 Layout.fillWidth: true; Layout.fillHeight: true
@@ -116,7 +116,7 @@ Rectangle {
                         width: (levelMeter.width - (levelMeter.cells - 1) * levelMeter.spacing) / levelMeter.cells
                         height: levelMeter.height
                         readonly property bool lit: recorderConsole.capturing && !recorderConsole.controller.paused && index < recorderConsole.controller.level * levelMeter.cells
-                        color: lit ? (index >= levelMeter.cells - 3 ? T.magenta : T.bandInk) : T.bandKey
+                        color: lit ? (index >= levelMeter.cells - 3 ? T.p.magenta : T.p.bandInk) : T.p.bandKey
                     }
                 }
                 Accessible.role: Accessible.Indicator
@@ -129,7 +129,7 @@ Rectangle {
             spacing: 0
             RowLayout {
                 Layout.fillWidth: true; Layout.preferredHeight: recorderConsole.rowHeight; spacing: 0
-                Text { Layout.preferredWidth: 64; text: "input"; font.family: T.sans; font.pixelSize: 13; color: T.bandInk }
+                Text { Layout.preferredWidth: 64; text: "input"; font.family: T.sans; font.pixelSize: 13; color: T.p.bandInk }
                 FieldCombo {
                     id: devicePicker
                     Layout.fillWidth: true; Layout.preferredHeight: recorderConsole.rowHeight
@@ -156,7 +156,7 @@ Rectangle {
             Item { Layout.fillHeight: true }
             RowLayout {
                 Layout.fillWidth: true; Layout.preferredHeight: recorderConsole.rowHeight; spacing: 0
-                Text { Layout.preferredWidth: 64; text: "save to"; font.family: T.sans; font.pixelSize: 13; color: T.bandInk }
+                Text { Layout.preferredWidth: 64; text: "save to"; font.family: T.sans; font.pixelSize: 13; color: T.p.bandInk }
                 FieldCombo {
                     Layout.fillWidth: true; Layout.preferredHeight: recorderConsole.rowHeight
                     onBand: true

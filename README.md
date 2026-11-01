@@ -13,6 +13,7 @@ The project focuses on reliable long-form capture, editable transcripts and orga
 - A dedicated Organise view with previews, drag-and-drop filing, bulk moves and an editor drawer.
 - A custom Markdown notes editor with formatting tools, a preview toggle, focused writing and automatic saving.
 - Clipboard copying, Markdown/text export, context menus and recoverable Trash.
+- Nine themes, light and dark, shared with TapeTop. See [DESIGN.md](DESIGN.md) for the design system.
 - Recovery of saved audio after interruption, with retry for failed transcription.
 - Automatic removal of temporary audio after its transcript is committed.
 - Read-only access to saved notes for scripts and LLM tools.
@@ -64,13 +65,15 @@ Use the sidebar to create workspaces and categories. Notes are titled from their
 
 Click **Select** above the sidebar notes to choose several notes, then **Move…** to file them together. You can also use ⌘-click to toggle notes, Shift-click to select a range, or ⌘A while the note list has focus. Right-click any note for **Move to category…**. Selection clears when changing workspace, category or search; the sidebar's Select all applies to loaded notes and labels that limit when more are available.
 
-Open **Organise** for a full collection view, including notes beyond the sidebar's first page. The workspace picker is labelled explicitly; categories stay in a separate sidebar while the notes scroll. Click a category to filter, or drag a note or selected group onto it to move them. Click a note to open its editor. Use **Select**, ⌘-click or Shift-click for multi-selection, then **Move…** or drag to a category. Search full transcripts and use **View** for sorting and filters. Category menus offer rename, reorder and remove; removing a category makes its notes Unfiled, including notes in Trash, without deleting them. Recording can continue while organising, with a Stop recording button available.
+The window has three sections: **notes**, **organise** and **trash** (⌘1, ⌘2, ⌘3, or click the titles). The recorder runs along the foot of the window in every section: the clock, **rec** (⌘R) and **pause** (⌘⇧P), the live input, and the microphone, voice filter and destination.
 
-Click **New text note** (⌘N) to type a note in the focused writing view. The **Write** tab keeps the original Markdown source; **Preview** renders headings, emphasis, lists, task lists, links, tables and code blocks without modifying the saved text. The formatting toolbar includes bold, italic, headings, lists and links, with every option also available under **Format** in compact windows. Formatting supports undo/redo; the editor also includes Find and a word count. The same editor is available in the Organise drawer. **Recorder** returns the recording controls, and an active recording keeps Pause and Stop available while writing.
+Open **organise** for a full collection view, including notes beyond the sidebar's first page. The workspace picker is labelled explicitly; categories stay in a separate sidebar while the notes scroll. Click a category to filter, or drag a note or selected group onto it to move them. Click a note to open its editor. Use **Select**, ⌘-click or Shift-click for multi-selection, then **Move…** or drag to a category. Search full transcripts and use **View** for sorting and filters. Category menus offer rename, reorder and remove; removing a category makes its notes Unfiled, including notes in Trash, without deleting them. Recording can continue while organising.
+
+Click **new note** (⌘N) to type a note in the focused writing view. The **Write** tab keeps the original Markdown source; **Preview** renders headings, emphasis, lists, task lists, links, tables and code blocks without modifying the saved text. The formatting toolbar includes bold, italic, headings, lists and links, with every option also available under **Format** in compact windows. Formatting supports undo/redo; the editor also includes Find and a word count. The same editor is available in the Organise drawer. **Focus** hides the recorder and **Recorder** returns it, and an active recording keeps Pause and Stop available while writing.
 
 Completed transcripts are editable. Text and title changes save after a 750 ms typing pause; switching notes or closing the app flushes pending edits. A transcript stays read-only while its recording or transcription is active.
 
-Each sidebar row has a copy icon. Right-click a note for copying, renaming, retrying unfinished transcription or moving it to Trash. A focused note row supports Delete/Backspace and Shift+F10; finished notes can also be dragged to Trash. Deleted notes can be restored through Undo or from Trash. Text editors provide standard right-click editing menus.
+Each note row shows **copy** when hovered or open. Right-click a note for copying, renaming, retrying unfinished transcription or moving it to Trash. A focused note row supports Delete/Backspace and Shift+F10; finished notes can also be dragged onto the **trash** title. Deleted notes can be restored through Undo or from Trash. Text editors provide standard right-click editing menus.
 
 Copy omits timestamps by default; the note menu offers copying with timestamps. Export (in the note’s More menu, or ⌘E) preserves timestamps in Markdown or plain text.
 
@@ -78,7 +81,11 @@ Copy omits timestamps by default; the note menu offers copying with timestamps. 
 
 Silero VAD detects speech before transcription. The voice filter applies a minimum captured level, defaulting to −72 dBFS and adjustable down to −90 dBFS. Lower the threshold if quiet speech is missed; raise it to suppress distant voices. This filter does not identify speakers, so louder background speech may still be transcribed.
 
-Quiet audio is amplified for inference while the filter and input meter use the original captured level. Speech timestamps retain their positions within the recording. Reduce Motion settings disable the recording animation.
+Quiet audio is amplified for inference while the filter and input meter use the original captured level. Speech timestamps retain their positions within the recording. Set the filter on the recorder or in **Settings** (⌘,).
+
+### Themes
+
+Choose a theme in **Settings** (⌘,) or **View → Theme**. Instrument light is the default; instrument, graphite, night, carbon and lodo are dark, and paper, studio and sand are light. Native menus, dialogs and the title bar follow the theme's appearance.
 
 ## Storage and recovery
 

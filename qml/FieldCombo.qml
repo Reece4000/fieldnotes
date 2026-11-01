@@ -18,7 +18,7 @@ ComboBox {
     contentItem: Text {
         text: control.displayText
         font: control.font
-        color: control.focusFlood ? T.floodInk : !control.enabled ? (control.onBand ? T.bandMuted : T.muted) : control.onBand ? T.bandInk : T.ink
+        color: control.focusFlood ? T.p.floodInk : !control.enabled ? (control.onBand ? T.p.bandMuted : T.p.muted) : control.onBand ? T.p.bandInk : T.p.ink
         verticalAlignment: Text.AlignVCenter
         elide: Text.ElideRight
     }
@@ -26,12 +26,12 @@ ComboBox {
         x: control.width - 20; y: (control.height - height) / 2
         visible: control.enabled
         text: "⌄"; font.family: T.mono; font.pixelSize: 13
-        color: control.focusFlood ? T.floodInk : control.onBand ? T.bandMuted : T.muted
+        color: control.focusFlood ? T.p.floodInk : control.onBand ? T.p.bandMuted : T.p.muted
     }
     background: Rectangle {
-        color: control.focusFlood ? T.accent
-             : control.onBand ? (control.enabled ? (control.hovered || control.popup.visible ? T.alpha(T.bandInk, .14) : T.bandKey) : "transparent")
-             : control.enabled ? (control.hovered || control.popup.visible ? T.dim : T.cell) : "transparent"
+        color: control.focusFlood ? T.p.accent
+             : control.onBand ? (control.enabled ? (control.hovered || control.popup.visible ? T.alpha(T.p.bandInk, .14) : T.p.bandKey) : "transparent")
+             : control.enabled ? (control.hovered || control.popup.visible ? T.p.dim : T.p.cell) : "transparent"
     }
     delegate: ItemDelegate {
         id: option
@@ -46,11 +46,11 @@ ComboBox {
         highlighted: control.highlightedIndex === index
         contentItem: Text {
             text: control.textRole ? option.modelData[control.textRole] : option.modelData
-            color: option.highlighted || option.hovered ? T.floodInk : control.currentIndex === option.index ? T.ink : T.muted
+            color: option.highlighted || option.hovered ? T.p.floodInk : control.currentIndex === option.index ? T.p.ink : T.p.muted
             font.family: T.mono; font.pixelSize: T.value; elide: Text.ElideRight
             verticalAlignment: Text.AlignVCenter
         }
-        background: Rectangle { color: option.highlighted || option.hovered ? T.ink : "transparent" }
+        background: Rectangle { color: option.highlighted || option.hovered ? T.p.ink : "transparent" }
     }
     popup: Popup {
         y: control.height
@@ -58,7 +58,7 @@ ComboBox {
         implicitHeight: Math.min(300, menuList.contentHeight + topPadding + bottomPadding)
         padding: 4
         margins: 12
-        background: Rectangle { color: T.cell }
+        background: Rectangle { color: T.p.cell }
         contentItem: ListView {
             id: menuList
             clip: true

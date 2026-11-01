@@ -7,14 +7,17 @@ Canvas {
     property var samples: []
     property bool capturing: false
     property bool paused: false
-    property color lineColour: T.bandInk
-    property color quietColour: T.bandMuted
-    property color gridColour: T.bandDot
+    property color lineColour: T.p.bandInk
+    property color quietColour: T.p.bandMuted
+    property color gridColour: T.p.bandDot
     onSamplesChanged: requestPaint()
     onCapturingChanged: requestPaint()
     onPausedChanged: requestPaint()
     onWidthChanged: requestPaint()
     onHeightChanged: requestPaint()
+    onLineColourChanged: requestPaint()
+    onQuietColourChanged: requestPaint()
+    onGridColourChanged: requestPaint()
     Accessible.role: Accessible.Indicator
     Accessible.name: "Live microphone waveform"
     onPaint: {

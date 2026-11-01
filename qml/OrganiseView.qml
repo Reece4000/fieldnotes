@@ -122,7 +122,7 @@ Item {
                 Layout.preferredWidth: 232; Layout.minimumWidth: 232; Layout.maximumWidth: 232; Layout.fillHeight: true; spacing: 8
                 RowLayout {
                     Layout.fillWidth: true
-                    Text { text: "categories"; font.family: T.sans; font.pixelSize: 13; color: T.muted }
+                    Text { text: "categories"; font.family: T.sans; font.pixelSize: 13; color: T.p.muted }
                     Item { Layout.fillWidth: true }
                     ActionButton { text: "+"; quiet: true; implicitHeight: 22; Accessible.name: "New category"; onClicked: root.createCategoryRequested() }
                 }
@@ -141,11 +141,11 @@ Item {
                         width: categoryRail.width; height: 28; leftPadding: 10; rightPadding: 4; topPadding: 0; bottomPadding: 0; hoverEnabled: true
                         Accessible.name: modelData.name + ", category"; Accessible.selected: root.category === modelData.value
                         onClicked: root.category = modelData.value
-                        background: Rectangle { color: drop.containsDrag || destination.visualFocus ? T.accent : destination.current ? T.ink : destination.hovered ? T.cell : "transparent" }
+                        background: Rectangle { color: drop.containsDrag || destination.visualFocus ? T.p.accent : destination.current ? T.p.ink : destination.hovered ? T.p.cell : "transparent" }
                         contentItem: RowLayout {
                             spacing: 8
-                            Text { text: destination.modelData.name; Layout.fillWidth: true; elide: Text.ElideRight; color: destination.inverted ? T.floodInk : T.ink; font.family: T.sans; font.pixelSize: 13 }
-                            Text { text: destination.modelData.value === "*" ? root.notes.length : root.groupNotes(destination.modelData.value).length; color: destination.inverted ? T.alpha(T.floodInk, .6) : T.muted; font.family: T.mono; font.pixelSize: T.small }
+                            Text { text: destination.modelData.name; Layout.fillWidth: true; elide: Text.ElideRight; color: destination.inverted ? T.p.floodInk : T.p.ink; font.family: T.sans; font.pixelSize: 13 }
+                            Text { text: destination.modelData.value === "*" ? root.notes.length : root.groupNotes(destination.modelData.value).length; color: destination.inverted ? T.alpha(T.p.floodInk, .6) : T.p.muted; font.family: T.mono; font.pixelSize: T.small }
                             ActionButton {
                                 id: categoryActions
                                 visible: destination.modelData.value !== "*" && destination.modelData.value !== ""
@@ -198,7 +198,7 @@ Item {
                 }
                 RowLayout {
                     visible: root.selecting; Layout.fillWidth: true; spacing: 2
-                    Text { text: root.controller.selectedNoteIds.length + " selected"; Layout.fillWidth: true; color: T.ink; font.family: T.mono; font.pixelSize: T.value }
+                    Text { text: root.controller.selectedNoteIds.length + " selected"; Layout.fillWidth: true; color: T.p.ink; font.family: T.mono; font.pixelSize: T.value }
                     ActionButton { text: "All"; quiet: true; Accessible.name: "Select all visible notes"; onClicked: root.controller.selectNotes(root.visibleNotes.map(n => n.id)) }
                     ActionButton { text: "Clear"; quiet: true; enabled: root.controller.selectedNoteIds.length > 0; onClicked: root.controller.clearNoteSelection() }
                     ActionButton { text: "Move"; enabled: root.controller.connected && root.controller.selectedNoteIds.length > 0 && !root.controller.moving; onClicked: root.moveRequested(root.controller.selectedNoteIds) }
@@ -220,7 +220,7 @@ Item {
                         readonly property var noteState: T.noteState(modelData)
                         width: files.width; height: 56; leftPadding: 12; rightPadding: 12; topPadding: 8; bottomPadding: 8; hoverEnabled: true
                         Accessible.role: Accessible.ListItem; Accessible.name: modelData.title; Accessible.selected: selected
-                        background: Rectangle { color: file.visualFocus ? T.accent : file.selected ? T.ink : file.hovered ? T.cell : file.index % 2 ? T.panel : "transparent" }
+                        background: Rectangle { color: file.visualFocus ? T.p.accent : file.selected ? T.p.ink : file.hovered ? T.p.cell : file.index % 2 ? T.p.panel : "transparent" }
                         onClicked: root.activateNote(modelData.id, Qt.NoModifier)
                         Keys.onReturnPressed: root.edit(modelData.id)
                         Keys.onSpacePressed: root.activateNote(modelData.id, Qt.ControlModifier)
@@ -256,17 +256,17 @@ Item {
                             }
                             ColumnLayout {
                                 Layout.fillWidth: true; spacing: 4
-                                Text { Layout.fillWidth: true; text: file.modelData.title; color: file.inverted ? T.floodInk : T.ink; font.family: T.sans; font.pixelSize: 14; elide: Text.ElideRight }
-                                Text { Layout.fillWidth: true; text: file.modelData.preview.replace(/\[\d+:\d+:\d+\]\s*/g, "").replace(/\s+/g, " ").trim() || "empty"; color: file.inverted ? T.alpha(T.floodInk, .6) : T.muted; font.family: T.sans; font.pixelSize: 12; elide: Text.ElideRight }
+                                Text { Layout.fillWidth: true; text: file.modelData.title; color: file.inverted ? T.p.floodInk : T.p.ink; font.family: T.sans; font.pixelSize: 14; elide: Text.ElideRight }
+                                Text { Layout.fillWidth: true; text: file.modelData.preview.replace(/\[\d+:\d+:\d+\]\s*/g, "").replace(/\s+/g, " ").trim() || "empty"; color: file.inverted ? T.alpha(T.p.floodInk, .6) : T.p.muted; font.family: T.sans; font.pixelSize: 12; elide: Text.ElideRight }
                             }
                             ColumnLayout {
                                 Layout.preferredWidth: Math.min(150, files.width * 0.28); spacing: 4
-                                Text { Layout.fillWidth: true; horizontalAlignment: Text.AlignRight; text: file.modelData.collection || "unfiled"; color: file.inverted ? T.floodInk : T.ink; font.family: T.mono; font.pixelSize: T.small; elide: Text.ElideRight }
+                                Text { Layout.fillWidth: true; horizontalAlignment: Text.AlignRight; text: file.modelData.collection || "unfiled"; color: file.inverted ? T.p.floodInk : T.p.ink; font.family: T.mono; font.pixelSize: T.small; elide: Text.ElideRight }
                                 RowLayout {
                                     Layout.fillWidth: true; spacing: 6
                                     Item { Layout.fillWidth: true }
                                     Rectangle { visible: !!file.noteState.text; Layout.preferredWidth: 6; Layout.preferredHeight: 6; color: file.noteState.color }
-                                    Text { text: file.noteState.text || T.date(file.modelData.updated); color: file.inverted ? T.alpha(T.floodInk, .6) : T.muted; font.family: T.mono; font.pixelSize: T.small }
+                                    Text { text: file.noteState.text || T.date(file.modelData.updated); color: file.inverted ? T.alpha(T.p.floodInk, .6) : T.p.muted; font.family: T.mono; font.pixelSize: T.small }
                                 }
                             }
                         }
@@ -275,7 +275,7 @@ Item {
                         anchors.centerIn: parent; width: parent.width - 32; horizontalAlignment: Text.AlignHCenter; wrapMode: Text.WordWrap
                         visible: files.count === 0
                         text: root.search || root.filter ? "no matches" : "no notes"
-                        font.family: T.mono; font.pixelSize: T.value; color: T.dim
+                        font.family: T.mono; font.pixelSize: T.value; color: T.p.dim
                     }
                 }
             }
@@ -283,9 +283,9 @@ Item {
         RowLayout {
             Layout.fillWidth: true
             Layout.preferredHeight: 22; spacing: 8
-            Rectangle { visible: !!root.controller.error || !!root.notice; Layout.preferredWidth: 6; Layout.preferredHeight: 6; color: root.controller.error ? T.magenta : T.ink }
-            Text { visible: !root.controller.error && !root.notice; text: "notes"; color: T.muted; font.family: T.sans; font.pixelSize: 12 }
-            Text { Layout.fillWidth: true; text: T.lower(root.controller.error || root.notice) || root.visibleNotes.length; color: root.controller.error ? T.ink : T.muted; font.family: T.mono; font.pixelSize: T.value; elide: Text.ElideRight }
+            Rectangle { visible: !!root.controller.error || !!root.notice; Layout.preferredWidth: 6; Layout.preferredHeight: 6; color: root.controller.error ? T.p.magenta : T.p.ink }
+            Text { visible: !root.controller.error && !root.notice; text: "notes"; color: T.p.muted; font.family: T.sans; font.pixelSize: 12 }
+            Text { Layout.fillWidth: true; text: T.lower(root.controller.error || root.notice) || root.visibleNotes.length; color: root.controller.error ? T.p.ink : T.p.muted; font.family: T.mono; font.pixelSize: T.value; elide: Text.ElideRight }
             ActionButton { visible: !!root.controller.error; text: "Dismiss"; quiet: true; implicitHeight: 22; onClicked: root.controller.dismissError() }
             ActionButton { text: "New note"; keys: "⌘N"; enabled: root.controller.connected; onClicked: root.newNote(root.category === "*" ? "" : root.category) }
         }
@@ -301,10 +301,10 @@ Item {
         property var ids: []
         property bool dragging: false
         visible: dragging; width: 180; height: 38; z: 100
-        color: T.ink
+        color: T.p.ink
         Drag.active: dragging; Drag.source: dragGhost; Drag.keys: ["organise-notes"]; Drag.supportedActions: Qt.MoveAction
         Drag.hotSpot.x: 90; Drag.hotSpot.y: 18
-        Text { anchors.centerIn: parent; text: dragGhost.ids.length + (dragGhost.ids.length === 1 ? " note" : " notes"); color: T.floodInk; font.family: T.mono; font.pixelSize: T.value }
+        Text { anchors.centerIn: parent; text: dragGhost.ids.length + (dragGhost.ids.length === 1 ? " note" : " notes"); color: T.p.floodInk; font.family: T.mono; font.pixelSize: T.value }
     }
     FieldMenu {
         id: categoryMenu
@@ -320,13 +320,13 @@ Item {
         closePolicy: root.categoryBusy ? Popup.NoAutoClose : Popup.CloseOnEscape | Popup.CloseOnPressOutside
         contentItem: ColumnLayout {
             spacing: 12
-            Text { Layout.fillWidth: true; visible: root.removingCategory; text: "“" + root.categoryTarget + "” becomes unfiled. No notes are deleted."; wrapMode: Text.WordWrap; color: T.ink; font.family: T.sans; font.pixelSize: T.label }
+            Text { Layout.fillWidth: true; visible: root.removingCategory; text: "“" + root.categoryTarget + "” becomes unfiled. No notes are deleted."; wrapMode: Text.WordWrap; color: T.p.ink; font.family: T.sans; font.pixelSize: T.label }
             FieldText {
                 id: categoryName
                 Layout.fillWidth: true; visible: !root.removingCategory; enabled: !root.categoryBusy
                 Accessible.name: "Category name"
             }
-            Text { Layout.fillWidth: true; visible: !!root.categoryError; text: T.lower(root.categoryError); wrapMode: Text.WordWrap; color: T.magenta; font.family: T.mono; font.pixelSize: T.value }
+            Text { Layout.fillWidth: true; visible: !!root.categoryError; text: T.lower(root.categoryError); wrapMode: Text.WordWrap; color: T.p.magenta; font.family: T.mono; font.pixelSize: T.value }
             RowLayout {
                 Layout.fillWidth: true
                 Item { Layout.fillWidth: true }
@@ -345,26 +345,27 @@ Item {
         modal: true; leftPadding: 24; rightPadding: 20; topPadding: 16; bottomPadding: 16
         onOpened: if (!root.controller.body && root.controller.editable) editBody.focusEditor()
         onClosed: { root.editTarget = ""; root.creatingNote = false }
-        background: Rectangle { color: T.panel }
-        Overlay.modal: Rectangle { color: T.alpha(T.ground, .6) }
+        background: Rectangle { color: T.p.panel }
+        Overlay.modal: Rectangle { color: T.alpha(T.p.ground, .6) }
         contentItem: ColumnLayout {
             spacing: 10
             RowLayout {
                 Layout.fillWidth: true
                 TextField {
                     id: editTitle
-                    Layout.fillWidth: true; implicitHeight: 34; font.family: T.sans; font.pixelSize: 22; color: T.ink; selectByMouse: true; padding: 0
-                    selectionColor: T.alpha(T.accent, .38); selectedTextColor: T.ink
+                    Layout.fillWidth: true; implicitHeight: 34; font.family: T.sans; font.pixelSize: 22; color: activeFocus ? T.p.ink : "transparent"; selectByMouse: true; padding: 0
+                    selectionColor: T.alpha(T.p.accent, .38); selectedTextColor: T.p.ink
                     Accessible.name: "Organise note title"; readOnly: root.controller.trashed
                     onTextEdited: if (!root.syncing) root.controller.updateTitle(text)
-                    background: Rectangle { anchors.fill: parent; anchors.leftMargin: -12; color: "transparent"; border.width: editTitle.activeFocus ? 1 : 0; border.color: T.accent }
+                    background: Rectangle { anchors.fill: parent; anchors.leftMargin: -12; color: "transparent"; border.width: editTitle.activeFocus ? 1 : 0; border.color: T.p.accent }
+                    Text { anchors.fill: parent; visible: !editTitle.activeFocus; text: editTitle.text; font: editTitle.font; color: T.p.ink; verticalAlignment: Text.AlignVCenter; elide: Text.ElideRight }
                     TextContextMenu { field: editTitle }
                 }
                 ActionButton { text: "Done"; keys: "esc"; quiet: true; onClicked: editDrawer.close() }
             }
             RowLayout {
             Layout.fillWidth: true; spacing: 12
-            Text { text: "category"; font.family: T.sans; font.pixelSize: 13; color: T.ink }
+            Text { text: "category"; font.family: T.sans; font.pixelSize: 13; color: T.p.ink }
             FieldCombo {
                 Layout.fillWidth: true; model: root.groups; textRole: "name"
                 Accessible.name: "Organise note category"; enabled: !root.controller.trashed
@@ -379,9 +380,9 @@ Item {
                 placeholderText: root.controller.editable ? "" : "transcribing"
                 onEdited: value => { if (editDrawer.visible) root.controller.updateBody(value) }
                 statusText: root.controller.error ? "" : root.controller.saving ? "saving" : root.controller.editable ? "saved" : "transcribing"
-                statusColour: !root.controller.error && !root.controller.saving && !root.controller.editable ? T.amber : "transparent"
+                statusColour: !root.controller.error && !root.controller.saving && !root.controller.editable ? T.p.amber : "transparent"
             }
-            Text { Layout.fillWidth: true; visible: !!root.controller.error; text: T.lower(root.controller.error); color: T.magenta; font.family: T.mono; font.pixelSize: T.value; wrapMode: Text.WordWrap }
+            Text { Layout.fillWidth: true; visible: !!root.controller.error; text: T.lower(root.controller.error); color: T.p.magenta; font.family: T.mono; font.pixelSize: T.value; wrapMode: Text.WordWrap }
             RowLayout {
                 Layout.fillWidth: true; spacing: 2
                 ActionButton { text: "Copy transcript"; enabled: !!root.controller.body; onClicked: root.controller.copy() }

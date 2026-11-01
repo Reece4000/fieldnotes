@@ -1,6 +1,6 @@
 ---
 name: Fieldnotes
-description: A voice notebook as a flat, type-led instrument. A near-black field for the notes, a silver band for the recorder.
+description: A voice notebook as a flat, type-led instrument. A field for the notes, a band of the opposite tone for the recorder, in nine themes.
 colors:
   ground: "#0c0d10"
   panel: "#16181c"
@@ -27,26 +27,33 @@ typography:
 layout:
   corners: "square everywhere"
   margin: "24"
-  rail: "280"
+  rail: "296"
 ---
 
 # Design System: Fieldnotes
 
 ## North star
 
-Fieldnotes is a voice notebook in the house instrument style of Macro OSC, Lodo and TapeTop. It is flat, square and led by type. The notes sit on a near-black field above, and the recorder is the silver band across the foot of the window, because the recorder is the surface you play.
+Fieldnotes is a voice notebook in the house instrument style of Macro OSC, Lodo and TapeTop. It is flat, square and led by type. The notes sit on a field above, and the recorder is the band across the foot of the window, because the recorder is the surface you play. The band always takes the opposite tone to the field: silver under a dark field, dark under a light one.
 
 ## Colour
 
-Colour is data, and each colour has one meaning. The tokens live in `qml/Theme.js`.
+Colour is data, and each colour has one meaning. The front matter shows the instrument theme. All themes live in `qml/ThemePalette.qml`, reached as `T.p.<token>` through `qml/Theme.js`. They are TapeTop's device themes, so the instruments share one vocabulary:
 
-- **Turquoise:** where the cursor is. A focused field or row floods turquoise with black ink. The note text is bare content, so it gets a turquoise frame instead.
+- **Light:** instrument light (the default), paper, studio and sand.
+- **Dark:** instrument, graphite, night, carbon and lodo.
+
+In each theme, the theme's track 4 is the amber role and track 2 the magenta role.
+
+The colour meanings:
+
+- **Accent (turquoise in instrument):** where the cursor is. A focused field or row floods with the accent and its ink turns to the accent's own ink. The note text is bare content, so it gets an accent frame instead.
 - **Amber:** transcription work still to do (pending audio, the model loading).
 - **Magenta:** something failed and needs you: needs retry, errors, the top of the level meter.
 - **Red:** recording, and nothing else. The rec key floods red while recording.
-- **Yellow-green:** the clock readout, and nothing else.
+- **Readout:** the clock, and nothing else. It is yellow-green in instrument. The readout window is the ground tone, so dark themes show a dark window on a silver band and light themes an LCD-like light window on a dark band.
 
-Everything else is greyscale. The current choice inverts: ink cell, black text.
+Everything else is greyscale. The current choice inverts: an ink cell with ground-tone text.
 
 ## Type
 

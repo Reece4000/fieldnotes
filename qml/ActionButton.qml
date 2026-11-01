@@ -14,16 +14,16 @@ Button {
     property bool lowercase: true
     readonly property string label: lowercase ? T.lower(text) : text
     readonly property bool focusFlood: control.visualFocus || (control.activeFocus && control.focusReason === Qt.TabFocusReason)
-    readonly property color fill: !control.enabled ? (control.quiet ? "transparent" : control.onBand ? T.alpha(T.bandKey, .5) : T.panel)
-        : control.focusFlood ? T.accent
-        : control.down || control.highlighted ? (control.onBand ? T.bandInk : T.ink)
-        : control.hovered ? (control.onBand ? T.bandKey : T.cell)
-        : control.quiet ? "transparent" : control.onBand ? T.bandKey : T.cell
-    readonly property color labelColour: !control.enabled ? (control.onBand ? T.bandMuted : T.dim)
-        : control.focusFlood ? T.floodInk
-        : control.down || control.highlighted ? (control.onBand ? T.band : T.floodInk)
-        : control.quiet && !control.hovered ? (control.onBand ? T.bandMuted : T.muted)
-        : control.onBand ? T.bandInk : T.ink
+    readonly property color fill: !control.enabled ? (control.quiet ? "transparent" : control.onBand ? T.alpha(T.p.bandKey, .5) : T.p.panel)
+        : control.focusFlood ? T.p.accent
+        : control.down || control.highlighted ? (control.onBand ? T.p.bandInk : T.p.ink)
+        : control.hovered ? (control.onBand ? T.p.bandKey : T.p.cell)
+        : control.quiet ? "transparent" : control.onBand ? T.p.bandKey : T.p.cell
+    readonly property color labelColour: !control.enabled ? (control.onBand ? T.p.bandMuted : T.p.dim)
+        : control.focusFlood ? T.p.floodInk
+        : control.down || control.highlighted ? (control.onBand ? T.p.band : T.p.floodInk)
+        : control.quiet && !control.hovered ? (control.onBand ? T.p.bandMuted : T.p.muted)
+        : control.onBand ? T.p.bandInk : T.p.ink
     implicitHeight: 28
     implicitWidth: Math.max(implicitHeight, Math.ceil(labelMetrics.advanceWidth) + leftPadding + rightPadding + (keys ? Math.ceil(keyMetrics.advanceWidth) + 10 : 0))
     leftPadding: 10; rightPadding: 10

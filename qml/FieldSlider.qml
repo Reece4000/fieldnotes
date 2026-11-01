@@ -13,8 +13,8 @@ Slider {
     property bool onBand: false
     property bool inline: false
     property real labelWidth: 64
-    readonly property color inkColour: onBand ? T.bandInk : T.ink
-    readonly property color mutedColour: onBand ? T.bandMuted : T.muted
+    readonly property color inkColour: onBand ? T.p.bandInk : T.p.ink
+    readonly property color mutedColour: onBand ? T.p.bandMuted : T.p.muted
     implicitHeight: inline ? 28 : 44
     implicitWidth: 200
     padding: 0
@@ -25,14 +25,14 @@ Slider {
     Accessible.name: label
     Rectangle {
         x: -3; y: labelText.y - 1; width: labelText.implicitWidth + 6; height: labelText.height + 2
-        visible: control.visualFocus; color: T.accent
+        visible: control.visualFocus; color: T.p.accent
     }
     Text {
         id: labelText
         y: control.inline ? (control.height - height) / 2 : 0; height: 18
         text: T.lower(control.label)
         font.family: T.sans; font.pixelSize: control.inline ? 13 : T.label
-        color: control.visualFocus ? T.floodInk : control.inkColour
+        color: control.visualFocus ? T.p.floodInk : control.inkColour
         verticalAlignment: Text.AlignVCenter
     }
     Row {
@@ -44,8 +44,8 @@ Slider {
     background: Rectangle {
         x: control.leftPadding; y: control.topPadding + (control.availableHeight - height) / 2
         width: control.availableWidth; height: 6
-        color: control.onBand ? T.bandKey : T.cell
-        Rectangle { width: control.visualPosition * parent.width; height: parent.height; color: control.onBand ? T.bandInk : T.accent }
+        color: control.onBand ? T.p.bandKey : T.p.cell
+        Rectangle { width: control.visualPosition * parent.width; height: parent.height; color: control.onBand ? T.p.bandInk : T.p.accent }
     }
     handle: Rectangle {
         x: control.leftPadding + control.visualPosition * (control.availableWidth - width)

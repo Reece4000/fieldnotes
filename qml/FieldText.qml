@@ -9,10 +9,10 @@ TextField {
     leftPadding: 10; rightPadding: 10
     selectByMouse: true
     font.family: T.mono; font.pixelSize: T.value
-    color: activeFocus ? T.floodInk : T.ink
-    placeholderTextColor: activeFocus ? T.alpha(T.floodInk, .55) : T.muted
-    selectionColor: T.floodInk; selectedTextColor: T.accent
+    color: activeFocus ? T.p.floodInk : T.p.ink
+    placeholderTextColor: activeFocus ? T.alpha(T.p.floodInk, .55) : T.p.muted
+    selectionColor: T.p.floodInk; selectedTextColor: T.p.accent
     verticalAlignment: TextInput.AlignVCenter
-    background: Rectangle { color: control.activeFocus ? T.accent : control.hovered ? T.dim : T.cell }
+    background: Rectangle { color: control.activeFocus ? T.p.accent : control.hovered ? T.p.dim : T.p.cell }
     TextContextMenu { field: control }
 }

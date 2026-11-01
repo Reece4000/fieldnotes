@@ -8,6 +8,6 @@ Menu {
     padding: 4
     margins: 12
     overlap: 0
-    background: Rectangle { color: T.cell }
+    background: Rectangle { color: T.p.cell }
     delegate: FieldMenuItem { }
 }

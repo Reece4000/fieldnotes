@@ -11,7 +11,7 @@ set(FIELDNOTES_ICON "${CMAKE_SOURCE_DIR}/assets/Fieldnotes.icns")
 set_source_files_properties("${FIELDNOTES_ICON}" PROPERTIES MACOSX_PACKAGE_LOCATION "Resources")
 target_sources(Fieldnotes PRIVATE "${FIELDNOTES_ICON}")
 qt_add_qml_module(Fieldnotes URI Fieldnotes VERSION 1.0
-  QML_FILES qml/Main.qml qml/Theme.js qml/OrganiseView.qml qml/NoteEditor.qml qml/PixelScroll.qml qml/TextContextMenu.qml
+  QML_FILES qml/Main.qml qml/Theme.js qml/ThemePalette.qml qml/OrganiseView.qml qml/NoteEditor.qml qml/PixelScroll.qml qml/TextContextMenu.qml
     qml/ActionButton.qml qml/BandKey.qml qml/CopyButton.qml qml/FieldCheck.qml qml/FieldCombo.qml qml/FieldDialog.qml
     qml/FieldMenu.qml qml/FieldMenuGap.qml qml/FieldMenuItem.qml qml/FieldScrollBar.qml qml/FieldSlider.qml qml/FieldText.qml
     qml/Readout.qml qml/RecordingConsole.qml qml/Waveform.qml

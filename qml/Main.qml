@@ -11,16 +11,16 @@ ApplicationWindow {
     width: Qt.application.arguments.indexOf("--compact") >= 0 ? 800 : 1280
     height: Qt.application.arguments.indexOf("--compact") >= 0 ? 620 : 900
     minimumWidth: 760; minimumHeight: 580
-    visible: true; title: "Fieldnotes"; color: T.ground
+    visible: true; title: "Fieldnotes"; color: T.p.ground
     flags: Qt.Window | Qt.ExpandedClientAreaHint | Qt.NoTitleBarBackgroundHint
     // The ground extends through the native title bar; ApplicationWindow keeps
     // interactive content inside the system-reported safe area.
-    background: Rectangle { color: T.ground }
+    background: Rectangle { color: T.p.ground }
     font.family: T.sans
-    palette.window: T.ground; palette.windowText: T.ink; palette.base: T.cell; palette.alternateBase: T.panel
-    palette.button: T.cell; palette.buttonText: T.ink; palette.text: T.ink; palette.brightText: T.ink
-    palette.placeholderText: T.muted; palette.highlight: T.accent; palette.highlightedText: T.floodInk
-    palette.toolTipBase: T.cell; palette.toolTipText: T.ink; palette.dark: T.cell; palette.mid: T.dim; palette.light: T.cell; palette.shadow: T.ground
+    palette.window: T.p.ground; palette.windowText: T.p.ink; palette.base: T.p.cell; palette.alternateBase: T.p.panel
+    palette.button: T.p.cell; palette.buttonText: T.p.ink; palette.text: T.p.ink; palette.brightText: T.p.ink
+    palette.placeholderText: T.p.muted; palette.highlight: T.p.accent; palette.highlightedText: T.p.floodInk
+    palette.toolTipBase: T.p.cell; palette.toolTipText: T.p.ink; palette.dark: T.p.cell; palette.mid: T.p.dim; palette.light: T.p.cell; palette.shadow: T.p.ground
     FontLoader { source: "../assets/fonts/Geist-Regular.ttf" }
     FontLoader { source: "../assets/fonts/Geist-Medium.ttf" }
     FontLoader { source: "../assets/fonts/GeistMono-Regular.ttf" }
@@ -89,7 +89,10 @@ ApplicationWindow {
         c.categories.filter(n => n.workspace === chosenWorkspace).map(n => ({name: n.name, value: n.name, count: n.count})))
     property var noteCategories: [{name: "unfiled", value: ""}].concat(
         c.categories.filter(n => n.workspace === c.workspace).map(n => ({name: n.name, value: n.name})))
-    Settings { id: preferences; location: window.c.settingsFile; property double voiceDb: -72; property bool reduceMotion: false; property string lastWorkspace: "inbox" }
+    Settings { id: preferences; location: window.c.settingsFile; property double voiceDb: -72; property bool reduceMotion: false; property string lastWorkspace: "inbox"; property string theme: "instrument-light" }
+    Binding { target: T.p; property: "themeId"; value: preferences.theme }
+    // Native dialogs, menus and the title bar follow the theme's appearance.
+    Binding { target: Qt.styleHints; property: "colorScheme"; value: T.p.light ? Qt.ColorScheme.Light : Qt.ColorScheme.Dark }
     function refreshQuery() { finishSelection(); if (c.connected) c.query(chosenWorkspace, organising ? "*" : chosenCategory, organising ? organiser.search : searchField.text, organising ? false : trash, organising) }
     onOrganisingChanged: refreshQuery()
     function currentCategory() { return chosenCategory === "*" || trash ? "" : chosenCategory }
@@ -148,9 +151,6 @@ ApplicationWindow {
     Shortcut { sequences: [StandardKey.Find]; onActivated: window.organising ? organiser.findInEditor() : noteEditor.focusSearch() }
     Shortcut { sequence: "Meta+Shift+F"; onActivated: window.organising ? organiser.focusSearch() : searchField.forceActiveFocus() }
     Shortcut { sequence: "Meta+E"; enabled: !!window.c.selectedId; onActivated: exportDialog.open() }
-    Shortcut { sequence: "Meta+1"; onActivated: window.chooseSection("notes") }
-    Shortcut { sequence: "Meta+2"; onActivated: window.chooseSection("organise") }
-    Shortcut { sequence: "Meta+3"; onActivated: window.chooseSection("trash") }
     Shortcut { sequence: "Escape"; enabled: noteDragGhost.dragging; onActivated: { noteDragGhost.Drag.cancel(); noteDragGhost.dragging = false } }
     FieldMenu {
         id: sidebarNoteMenu
@@ -187,10 +187,10 @@ ApplicationWindow {
         property string noteTitle: ""
         property bool dragging: false
         visible: dragging; width: 210; height: 38; z: 100
-        color: T.ink
+        color: T.p.ink
         Drag.active: dragging; Drag.source: noteDragGhost; Drag.keys: ["fieldnotes-note"]
         Drag.supportedActions: Qt.MoveAction; Drag.hotSpot.x: width / 2; Drag.hotSpot.y: height / 2
-        Text { anchors.fill: parent; anchors.margins: 10; text: noteDragGhost.noteTitle; color: T.floodInk; font.family: T.mono; font.pixelSize: T.value; elide: Text.ElideRight; verticalAlignment: Text.AlignVCenter }
+        Text { anchors.fill: parent; anchors.margins: 10; text: noteDragGhost.noteTitle; color: T.p.floodInk; font.family: T.mono; font.pixelSize: T.value; elide: Text.ElideRight; verticalAlignment: Text.AlignVCenter }
     }
     FileDialog { id: exportDialog; title: "Export note"; fileMode: FileDialog.SaveFile; nameFilters: ["Markdown notes (*.md)", "Text files (*.txt)"]; defaultSuffix: "md"; onAccepted: window.c.exportNote(selectedFile) }
     FieldDialog {
@@ -205,11 +205,11 @@ ApplicationWindow {
             spacing: 12
             RowLayout {
                 Layout.fillWidth: true
-                Text { text: "workspace"; color: T.ink; font.family: T.sans; font.pixelSize: T.label }
+                Text { text: "workspace"; color: T.p.ink; font.family: T.sans; font.pixelSize: T.label }
                 Item { Layout.fillWidth: true }
-                Text { text: window.workspaceName(moveDialog.workspace); color: T.muted; font.family: T.mono; font.pixelSize: T.value }
+                Text { text: window.workspaceName(moveDialog.workspace); color: T.p.muted; font.family: T.mono; font.pixelSize: T.value }
             }
-            Text { text: "category"; color: T.ink; font.family: T.sans; font.pixelSize: T.label }
+            Text { text: "category"; color: T.p.ink; font.family: T.sans; font.pixelSize: T.label }
             FieldCombo {
                 id: moveCategory
                 Layout.fillWidth: true; textRole: "name"
@@ -217,7 +217,7 @@ ApplicationWindow {
                 enabled: !window.c.moving
                 model: [{name: "unfiled", value: ""}].concat(window.c.categories.filter(n => n.workspace === moveDialog.workspace).map(n => ({name: n.name, value: n.name})))
             }
-            Text { Layout.fillWidth: true; visible: !!moveDialog.errorText; text: T.lower(moveDialog.errorText); color: T.magenta; wrapMode: Text.WordWrap; font.family: T.mono; font.pixelSize: T.value }
+            Text { Layout.fillWidth: true; visible: !!moveDialog.errorText; text: T.lower(moveDialog.errorText); color: T.p.magenta; wrapMode: Text.WordWrap; font.family: T.mono; font.pixelSize: T.value }
             RowLayout {
                 Layout.fillWidth: true; spacing: 8
                 Item { Layout.fillWidth: true }
@@ -244,7 +244,7 @@ ApplicationWindow {
         contentItem: ColumnLayout {
             spacing: 8
             FieldText { id: creationName; Layout.fillWidth: true; placeholderText: "name"; Accessible.name: "Name"; enabled: !window.creating; onAccepted: creationDialog.submit() }
-            Text { Layout.fillWidth: true; Layout.preferredHeight: 32; text: T.lower(window.creationError); color: T.magenta; wrapMode: Text.WordWrap; font.family: T.mono; font.pixelSize: T.small }
+            Text { Layout.fillWidth: true; Layout.preferredHeight: 32; text: T.lower(window.creationError); color: T.p.magenta; wrapMode: Text.WordWrap; font.family: T.mono; font.pixelSize: T.small }
             RowLayout {
             Layout.fillWidth: true; spacing: 8
             Item { Layout.fillWidth: true }
@@ -255,9 +255,21 @@ ApplicationWindow {
     }
     FieldDialog {
         id: filterDialog
-        anchors.centerIn: parent; width: 420; modal: true; title: "Voice filter"
+        anchors.centerIn: parent; width: 440; modal: true; title: "Settings"
         contentItem: ColumnLayout {
             spacing: 18
+            RowLayout {
+                Layout.fillWidth: true; spacing: 16
+                Text { text: "theme"; color: T.p.ink; font.family: T.sans; font.pixelSize: T.label }
+                FieldCombo {
+                    id: themePicker
+                    Layout.fillWidth: true
+                    model: T.p.themes; textRole: "name"
+                    currentIndex: Math.max(0, T.p.themes.findIndex(t => t.id === preferences.theme))
+                    Accessible.name: "Theme"
+                    onActivated: preferences.theme = T.p.themes[currentIndex].id
+                }
+            }
             FieldSlider {
                 id: voiceSlider
                 Layout.fillWidth: true
@@ -267,9 +279,9 @@ ApplicationWindow {
             }
             RowLayout {
                 Layout.fillWidth: true; Layout.topMargin: -12
-                Text { text: "quiet"; font.family: T.mono; font.pixelSize: T.small; color: T.muted }
+                Text { text: "quiet"; font.family: T.mono; font.pixelSize: T.small; color: T.p.muted }
                 Item { Layout.fillWidth: true }
-                Text { text: "near"; font.family: T.mono; font.pixelSize: T.small; color: T.muted }
+                Text { text: "near"; font.family: T.mono; font.pixelSize: T.small; color: T.p.muted }
             }
             FieldCheck { id: motionCheck; text: "Reduce motion"; checked: preferences.reduceMotion; onToggled: preferences.reduceMotion = checked }
             RowLayout { Layout.fillWidth: true; Item { Layout.fillWidth: true } ActionButton { text: "Close"; keys: "esc"; onClicked: filterDialog.close() } }
@@ -284,7 +296,7 @@ ApplicationWindow {
             MenuSeparator { }
             Action { text: window.c.recording ? "Stop recording" : "Record a session"; shortcut: "Meta+R"; onTriggered: window.recordToggle() }
             Action { text: window.c.paused ? "Resume recording" : "Pause recording"; enabled: window.c.recording; onTriggered: window.c.pause() }
-            Action { text: "Voice filter…"; onTriggered: filterDialog.open() }
+            Action { text: "Settings…"; shortcut: StandardKey.Preferences; onTriggered: filterDialog.open() }
             MenuSeparator { }
             Action { text: "Export note…"; enabled: !!window.c.selectedId; onTriggered: exportDialog.open() }
             Action { text: "Quit Fieldnotes"; shortcut: StandardKey.Quit; onTriggered: window.close() }
@@ -297,6 +309,28 @@ ApplicationWindow {
             Action { text: "Copy transcript"; enabled: !!window.c.body; onTriggered: window.c.copy() }
             Action { text: "Copy with timestamps"; enabled: !!window.c.body; onTriggered: window.c.copy(true) }
             Action { text: "Find notes"; onTriggered: window.organising ? organiser.focusSearch() : searchField.forceActiveFocus() }
+        }
+        Menu {
+            title: "View"
+            Action { text: "Notes"; shortcut: "Meta+1"; checkable: true; checked: window.section === "notes"; onTriggered: window.chooseSection("notes") }
+            Action { text: "Organise"; shortcut: "Meta+2"; checkable: true; checked: window.section === "organise"; onTriggered: window.chooseSection("organise") }
+            Action { text: "Trash"; shortcut: "Meta+3"; checkable: true; checked: window.section === "trash"; onTriggered: window.chooseSection("trash") }
+            MenuSeparator { }
+            Menu {
+                id: themeMenu
+                title: "Theme"
+                Instantiator {
+                    model: T.p.themes
+                    delegate: Action {
+                        required property var modelData
+                        text: modelData.name; checkable: true
+                        checked: preferences.theme === modelData.id
+                        onTriggered: preferences.theme = modelData.id
+                    }
+                    onObjectAdded: (index, object) => themeMenu.insertAction(index, object)
+                    onObjectRemoved: (index, object) => themeMenu.removeAction(object)
+                }
+            }
         }
     }
     ColumnLayout {
@@ -317,9 +351,9 @@ ApplicationWindow {
                     readonly property bool dropping: modelData === "trash" && trashDrop.containsDrag
                     text: modelData
                     font.family: T.sans; font.pixelSize: T.section
-                    color: dropping ? T.floodInk : current ? T.ink : sectionHover.hovered ? T.alpha(T.ink, .7) : T.dim
+                    color: dropping ? T.p.floodInk : current ? T.p.ink : sectionHover.hovered ? T.alpha(T.p.ink, .7) : T.p.dim
                     Accessible.role: Accessible.PageTab; Accessible.name: modelData; Accessible.selected: current
-                    Rectangle { visible: sectionTitle.dropping; z: -1; anchors.fill: parent; anchors.margins: -4; color: T.accent }
+                    Rectangle { visible: sectionTitle.dropping; z: -1; anchors.fill: parent; anchors.margins: -4; color: T.p.accent }
                     HoverHandler { id: sectionHover; cursorShape: Qt.PointingHandCursor }
                     TapHandler { onTapped: window.chooseSection(sectionTitle.modelData) }
                     DropArea {
@@ -333,7 +367,7 @@ ApplicationWindow {
                 }
             }
             Item { Layout.fillWidth: true }
-            Text { text: "workspace"; color: T.ink; font.family: T.sans; font.pixelSize: T.label }
+            Text { text: "workspace"; color: T.p.ink; font.family: T.sans; font.pixelSize: T.label }
             FieldCombo {
                 id: workspacePicker
                 Layout.preferredWidth: window.width < 1000 ? 150 : 200
@@ -348,10 +382,10 @@ ApplicationWindow {
                 spacing: 8
                 Rectangle {
                     anchors.verticalCenter: parent.verticalCenter; width: 8; height: 8
-                    color: window.c.engineStatus === "ready" ? T.ink : window.c.engineStatus === "error" ? T.magenta : T.amber
+                    color: window.c.engineStatus === "ready" ? T.p.ink : window.c.engineStatus === "error" ? T.p.magenta : T.p.amber
                 }
                 Text {
-                    text: "phonon-2"; font.family: T.mono; font.pixelSize: T.value; color: T.muted
+                    text: "phonon-2"; font.family: T.mono; font.pixelSize: T.value; color: T.p.muted
                     ToolTip.visible: engineHover.hovered && window.c.engineStatus === "error"; ToolTip.text: T.lower(window.c.engineError)
                     HoverHandler { id: engineHover }
                 }
@@ -364,9 +398,11 @@ ApplicationWindow {
             RowLayout {
                 anchors.fill: parent; spacing: 0; visible: !window.organising
                 Rectangle {
-                    Layout.preferredWidth: 280; Layout.fillHeight: true; color: T.panel
+                    Layout.preferredWidth: 296; Layout.fillHeight: true; color: T.p.panel
                     ColumnLayout {
-                        anchors.fill: parent; anchors.margins: window.height < 700 ? 12 : 16; spacing: window.height < 700 ? 8 : 12
+                        anchors.fill: parent; anchors.leftMargin: 24; anchors.rightMargin: 24
+                        anchors.topMargin: window.height < 700 ? 12 : 16; anchors.bottomMargin: window.height < 700 ? 12 : 16
+                        spacing: window.height < 700 ? 8 : 12
                         ActionButton { text: "New note"; keys: "⌘N"; Layout.fillWidth: true; enabled: window.c.connected; onClicked: window.newNote() }
                         FieldText {
                             id: searchField
@@ -376,7 +412,7 @@ ApplicationWindow {
                         }
                         RowLayout {
                             Layout.fillWidth: true; Layout.topMargin: 4; visible: !window.trash
-                            Text { text: "categories"; color: T.muted; font.family: T.sans; font.pixelSize: 13 }
+                            Text { text: "categories"; color: T.p.muted; font.family: T.sans; font.pixelSize: 13 }
                             Item { Layout.fillWidth: true }
                             ActionButton { text: "+"; quiet: true; implicitHeight: 22; Accessible.name: "New category"; onClicked: window.create("category") }
                         }
@@ -392,23 +428,23 @@ ApplicationWindow {
                                 id: categoryDelegate
                                 required property var modelData
                                 readonly property bool current: !window.trash && window.chosenCategory === modelData.value
-                                readonly property color inkColour: visualFocus || current ? T.floodInk : T.ink
+                                readonly property color inkColour: visualFocus || current ? T.p.floodInk : T.p.ink
                                 width: ListView.view.width; height: 28; leftPadding: 10; rightPadding: 10; topPadding: 0; bottomPadding: 0; hoverEnabled: true
                                 Accessible.name: modelData.name
                                 onClicked: { window.trash = false; window.chosenCategory = modelData.value; window.refreshQuery() }
                                 MouseArea { anchors.fill: parent; acceptedButtons: Qt.RightButton; onPressed: mouse => { window.contextCategory = categoryDelegate.modelData.value === "*" ? "" : categoryDelegate.modelData.value; categoryMenu.popup(categoryDelegate, mouse.x, mouse.y) } }
-                                background: Rectangle { color: categoryDelegate.visualFocus ? T.accent : categoryDelegate.current ? T.ink : categoryDelegate.hovered ? T.cell : "transparent" }
+                                background: Rectangle { color: categoryDelegate.visualFocus ? T.p.accent : categoryDelegate.current ? T.p.ink : categoryDelegate.hovered ? T.p.cell : "transparent" }
                                 contentItem: RowLayout {
                                     spacing: 10
                                     Text { Layout.fillWidth: true; text: categoryDelegate.modelData.name; color: categoryDelegate.inkColour; font.family: T.sans; font.pixelSize: 13; elide: Text.ElideRight }
-                                    Text { text: categoryDelegate.modelData.count === undefined ? "" : categoryDelegate.modelData.count; color: categoryDelegate.visualFocus || categoryDelegate.current ? T.alpha(T.floodInk, .6) : T.muted; font.family: T.mono; font.pixelSize: T.small }
+                                    Text { text: categoryDelegate.modelData.count === undefined ? "" : categoryDelegate.modelData.count; color: categoryDelegate.visualFocus || categoryDelegate.current ? T.alpha(T.p.floodInk, .6) : T.p.muted; font.family: T.mono; font.pixelSize: T.small }
                                 }
                             }
                         }
                         RowLayout {
                             Layout.fillWidth: true; Layout.topMargin: 4; spacing: 8
-                            Text { text: window.trash ? "in trash" : "notes"; color: T.muted; font.family: T.sans; font.pixelSize: 13 }
-                            Text { text: window.c.total; color: T.muted; font.family: T.mono; font.pixelSize: T.small }
+                            Text { text: window.trash ? "in trash" : "notes"; color: T.p.muted; font.family: T.sans; font.pixelSize: 13 }
+                            Text { text: window.c.total; color: T.p.muted; font.family: T.mono; font.pixelSize: T.small }
                             Item { Layout.fillWidth: true }
                             ActionButton {
                                 text: window.showNoteSelection ? "Done" : "Select"
@@ -420,7 +456,7 @@ ApplicationWindow {
                         }
                         RowLayout {
                             Layout.fillWidth: true; spacing: 2; visible: window.showNoteSelection && !window.trash
-                            Text { Layout.fillWidth: true; text: window.c.selectedNoteIds.length + " selected"; color: T.ink; font.family: T.mono; font.pixelSize: T.value }
+                            Text { Layout.fillWidth: true; text: window.c.selectedNoteIds.length + " selected"; color: T.p.ink; font.family: T.mono; font.pixelSize: T.value }
                             ActionButton { text: "All"; quiet: true; Accessible.name: noteList.count < window.c.total ? "Select all loaded notes" : "Select all notes"; onClicked: window.c.selectAllNotes() }
                             ActionButton { text: "Move"; enabled: window.c.connected && window.c.selectedNoteIds.length > 0 && !window.c.moving; onClicked: window.openMove(window.c.selectedNoteIds, window.chosenWorkspace) }
                         }
@@ -485,7 +521,7 @@ ApplicationWindow {
                                     }
                                     onCanceled: { noteDragGhost.Drag.cancel(); noteDragGhost.dragging = false }
                                 }
-                                background: Rectangle { color: noteDelegate.visualFocus ? T.accent : noteDelegate.current ? T.ink : noteDelegate.hovered ? T.cell : "transparent" }
+                                background: Rectangle { color: noteDelegate.visualFocus ? T.p.accent : noteDelegate.current ? T.p.ink : noteDelegate.hovered ? T.p.cell : "transparent" }
                                 contentItem: RowLayout {
                                     spacing: 10
                                     FieldCheck {
@@ -500,8 +536,8 @@ ApplicationWindow {
                                         spacing: 3
                                         RowLayout {
                                             Layout.fillWidth: true; spacing: 6
-                                            Text { Layout.fillWidth: true; text: noteDelegate.modelData.title; font.family: T.sans; font.pixelSize: 13; color: noteDelegate.inverted ? T.floodInk : T.ink; elide: Text.ElideRight }
-                                            Rectangle { Layout.preferredWidth: 6; Layout.preferredHeight: 6; color: T.record; visible: noteDelegate.modelData.status === "recording" || noteDelegate.modelData.status === "paused" }
+                                            Text { Layout.fillWidth: true; text: noteDelegate.modelData.title; font.family: T.sans; font.pixelSize: 13; color: noteDelegate.inverted ? T.p.floodInk : T.p.ink; elide: Text.ElideRight }
+                                            Rectangle { Layout.preferredWidth: 6; Layout.preferredHeight: 6; color: T.p.record; visible: noteDelegate.modelData.status === "recording" || noteDelegate.modelData.status === "paused" }
                                         }
                                         RowLayout {
                                             Layout.fillWidth: true; spacing: 6
@@ -509,9 +545,9 @@ ApplicationWindow {
                                                 Layout.fillWidth: true
                                                 text: (noteDelegate.modelData.collection || "unfiled") + "  " + (noteDelegate.noteState.text || T.date(noteDelegate.modelData.created))
                                                 font.family: T.mono; font.pixelSize: T.small
-                                                color: noteDelegate.inverted ? T.alpha(T.floodInk, .6) : T.muted; elide: Text.ElideRight
+                                                color: noteDelegate.inverted ? T.alpha(T.p.floodInk, .6) : T.p.muted; elide: Text.ElideRight
                                             }
-                                            Rectangle { visible: !!noteDelegate.noteState.text && noteDelegate.noteState.color !== T.record; Layout.preferredWidth: 6; Layout.preferredHeight: 6; color: noteDelegate.noteState.color }
+                                            Rectangle { visible: !!noteDelegate.noteState.text && !noteDelegate.noteState.recording; Layout.preferredWidth: 6; Layout.preferredHeight: 6; color: noteDelegate.noteState.color }
                                         }
                                     }
                                     ActionButton {
@@ -529,7 +565,7 @@ ApplicationWindow {
                                 }
                             }
                             footer: ActionButton { width: noteList.width; text: "Load more"; quiet: true; visible: noteList.count < window.c.total; height: visible ? 32 : 0; onClicked: window.c.loadMore() }
-                            Text { anchors.centerIn: parent; text: searchField.text ? "no matches" : window.trash ? "trash is empty" : "no notes"; color: T.dim; font.family: T.mono; font.pixelSize: T.value; visible: !noteList.count }
+                            Text { anchors.centerIn: parent; text: searchField.text ? "no matches" : window.trash ? "trash is empty" : "no notes"; color: T.p.dim; font.family: T.mono; font.pixelSize: T.value; visible: !noteList.count }
                             MouseArea { anchors.fill: parent; enabled: !noteList.count; acceptedButtons: Qt.RightButton; onPressed: mouse => workspaceMenu.popup(noteList, mouse.x, mouse.y) }
                         }
                     }
@@ -548,12 +584,18 @@ ApplicationWindow {
                             readOnly: window.c.trashed || !window.c.selectedId
                             placeholderText: window.c.selectedId ? "untitled" : "no note"
                             font.family: T.sans; font.pixelSize: 24
-                            color: T.ink; placeholderTextColor: T.dim; padding: 0; leftPadding: 0; selectByMouse: true
-                            selectionColor: T.alpha(T.accent, .38); selectedTextColor: T.ink
+                            // While not editing, the elided copy below stands in, so a long title ends in … rather than a hard cut.
+                            color: activeFocus ? T.p.ink : "transparent"; placeholderTextColor: T.p.dim; padding: 0; leftPadding: 0; selectByMouse: true
+                            selectionColor: T.alpha(T.p.accent, .38); selectedTextColor: T.p.ink
                             Accessible.name: "Note title"
                             TextContextMenu { field: titleField }
                             onTextEdited: if (!window.syncing) window.c.updateTitle(text)
-                            background: Rectangle { anchors.fill: parent; anchors.leftMargin: -12; color: "transparent"; border.width: titleField.activeFocus ? 1 : 0; border.color: T.accent }
+                            background: Rectangle { anchors.fill: parent; anchors.leftMargin: -12; color: "transparent"; border.width: titleField.activeFocus ? 1 : 0; border.color: T.p.accent }
+                            Text {
+                                anchors.fill: parent; visible: !titleField.activeFocus
+                                text: titleField.text; font: titleField.font; color: T.p.ink
+                                verticalAlignment: Text.AlignVCenter; elide: Text.ElideRight
+                            }
                         }
                         ActionButton {
                             id: locationButton
@@ -567,17 +609,17 @@ ApplicationWindow {
                                 id: locationPopup
                                 x: Math.min(0, locationButton.width - width)
                                 y: locationButton.height; width: 280; padding: 16
-                                background: Rectangle { color: T.cell }
+                                background: Rectangle { color: T.p.cell }
                                 contentItem: ColumnLayout {
                                     spacing: 6
-                                    Text { text: "workspace"; font.family: T.sans; font.pixelSize: 13; color: T.ink }
+                                    Text { text: "workspace"; font.family: T.sans; font.pixelSize: 13; color: T.p.ink }
                                     FieldCombo {
                                         Layout.fillWidth: true
                                         model: window.c.workspaces; textRole: "name"; Accessible.name: "Note workspace"
                                         currentIndex: Math.max(0, window.c.workspaces.findIndex(n => n.id === window.c.workspace))
                                         onActivated: window.c.updateWorkspace(model[currentIndex].id)
                                     }
-                                    Text { Layout.topMargin: 8; text: "category"; font.family: T.sans; font.pixelSize: 13; color: T.ink }
+                                    Text { Layout.topMargin: 8; text: "category"; font.family: T.sans; font.pixelSize: 13; color: T.p.ink }
                                     FieldCombo {
                                         Layout.fillWidth: true
                                         model: window.noteCategories; textRole: "name"; Accessible.name: "Note category"
@@ -598,7 +640,7 @@ ApplicationWindow {
                                 FieldMenuItem { text: "Export note…"; onTriggered: exportDialog.open() }
                                 FieldMenuItem { text: "Copy with timestamps"; enabled: !!window.c.body; onTriggered: window.c.copy(true) }
                                 FieldMenuItem { text: "Retry unfinished audio"; enabled: window.c.failed > 0 || window.c.engineStatus === "error"; onTriggered: window.c.retry() }
-                                FieldMenuItem { text: "Voice filter…"; onTriggered: filterDialog.open() }
+                                FieldMenuItem { text: "Settings…"; onTriggered: filterDialog.open() }
                                 FieldMenuGap { }
                                 FieldMenuItem { text: window.c.trashed ? "Restore note" : "Move note to trash"; enabled: window.c.editable || window.c.trashed; onTriggered: window.c.trashed ? window.c.restoreNote() : window.c.deleteNote() }
                             }
@@ -610,7 +652,7 @@ ApplicationWindow {
                         readOnly: !window.c.editable
                         allowFocusMode: true; focusedWriting: window.focusedWriting
                         statusText: !window.c.selectedId ? "" : window.c.trashed ? "in trash" : window.c.saving ? "saving" : window.c.pending ? "transcribing " + window.c.pending : "saved"
-                        statusColour: window.c.selectedId && !window.c.trashed && !window.c.saving && window.c.pending ? T.amber : "transparent"
+                        statusColour: window.c.selectedId && !window.c.trashed && !window.c.saving && window.c.pending ? T.p.amber : "transparent"
                         onFocusModeRequested: window.focusedWriting = !window.focusedWriting
                         placeholderText: !window.c.selectedId ? "" : window.c.noteStatus === "recording" || window.c.noteStatus === "paused" ? "listening" : window.c.pending ? "transcribing" : ""
                         onEdited: value => window.c.updateBody(value)
@@ -619,11 +661,11 @@ ApplicationWindow {
                         Layout.fillWidth: true; Layout.preferredHeight: 22; spacing: 8
                         readonly property string message: window.c.error || (window.c.engineStatus === "error" ? window.c.engineError || "transcription failed" : window.notice || (window.c.pending && !window.c.recording ? "finishing transcription" : ""))
                         readonly property bool failing: !!window.c.error || window.c.engineStatus === "error"
-                        Rectangle { visible: !!parent.message; Layout.preferredWidth: 6; Layout.preferredHeight: 6; color: parent.failing ? T.magenta : window.notice ? T.ink : T.amber }
+                        Rectangle { visible: !!parent.message; Layout.preferredWidth: 6; Layout.preferredHeight: 6; color: parent.failing ? T.p.magenta : window.notice ? T.p.ink : T.p.amber }
                         Text {
                             Layout.fillWidth: true
                             text: T.lower(parent.message)
-                            color: parent.failing ? T.ink : T.muted; font.family: T.mono; font.pixelSize: T.value; elide: Text.ElideRight
+                            color: parent.failing ? T.p.ink : T.p.muted; font.family: T.mono; font.pixelSize: T.value; elide: Text.ElideRight
                             ToolTip.visible: statusHover.hovered && truncated; ToolTip.text: text
                             HoverHandler { id: statusHover }
                         }
@@ -649,12 +691,12 @@ ApplicationWindow {
         Rectangle {
             Layout.fillWidth: true; Layout.preferredHeight: 40
             visible: window.focusedWriting && window.c.recording
-            color: T.band
+            color: T.p.band
             RowLayout {
                 anchors.fill: parent; anchors.leftMargin: 24; anchors.rightMargin: 24; spacing: 12
-                Rectangle { Layout.preferredWidth: 8; Layout.preferredHeight: 8; color: T.record; opacity: window.c.paused ? .45 : 1 }
-                Text { text: window.c.clock(window.c.seconds); color: T.bandInk; font.family: T.mono; font.pixelSize: T.value }
-                Text { Layout.fillWidth: true; text: window.c.paused ? "paused" : "recording"; color: T.bandMuted; font.family: T.mono; font.pixelSize: T.value }
+                Rectangle { Layout.preferredWidth: 8; Layout.preferredHeight: 8; color: T.p.record; opacity: window.c.paused ? .45 : 1 }
+                Text { text: window.c.clock(window.c.seconds); color: T.p.bandInk; font.family: T.mono; font.pixelSize: T.value }
+                Text { Layout.fillWidth: true; text: window.c.paused ? "paused" : "recording"; color: T.p.bandMuted; font.family: T.mono; font.pixelSize: T.value }
                 ActionButton { onBand: true; text: window.c.paused ? "Resume" : "Pause"; keys: "⌘⇧P"; enabled: !window.c.stopping; onClicked: window.c.pause() }
                 ActionButton { onBand: true; text: window.c.stopping ? "Stopping" : "Stop"; keys: "⌘R"; enabled: !window.c.stopping; onClicked: window.c.stop() }
             }

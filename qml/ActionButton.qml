@@ -1,36 +1,54 @@
 import QtQuick
 import QtQuick.Controls
+import "Theme.js" as T
 
+// A flat square key. Quiet keys are bare words; `highlighted` inverts the cell for the
+// current choice; keyboard focus floods the key with the accent.
 Button {
     id: control
-    property string glyph: ""
     property bool primary: false
     property bool quiet: false
-    property color accent: "#b44530"
-    implicitHeight: 36
-    implicitWidth: Math.max(36, Math.ceil(labelMetrics.advanceWidth) + 30 + (glyph ? 26 : 0))
-    padding: 12
-    topPadding: Math.max(2, (height - font.pixelSize - 6) / 2)
-    bottomPadding: topPadding
+    property bool onBand: false
+    property string keys: ""
+    // Labels are lowercase; user content (names, titles) keeps its case.
+    property bool lowercase: true
+    readonly property string label: lowercase ? T.lower(text) : text
+    readonly property bool focusFlood: control.visualFocus || (control.activeFocus && control.focusReason === Qt.TabFocusReason)
+    readonly property color fill: !control.enabled ? (control.quiet ? "transparent" : control.onBand ? T.alpha(T.bandKey, .5) : T.panel)
+        : control.focusFlood ? T.accent
+        : control.down || control.highlighted ? (control.onBand ? T.bandInk : T.ink)
+        : control.hovered ? (control.onBand ? T.bandKey : T.cell)
+        : control.quiet ? "transparent" : control.onBand ? T.bandKey : T.cell
+    readonly property color labelColour: !control.enabled ? (control.onBand ? T.bandMuted : T.dim)
+        : control.focusFlood ? T.floodInk
+        : control.down || control.highlighted ? (control.onBand ? T.band : T.floodInk)
+        : control.quiet && !control.hovered ? (control.onBand ? T.bandMuted : T.muted)
+        : control.onBand ? T.bandInk : T.ink
+    implicitHeight: 28
+    implicitWidth: Math.max(implicitHeight, Math.ceil(labelMetrics.advanceWidth) + leftPadding + rightPadding + (keys ? Math.ceil(keyMetrics.advanceWidth) + 10 : 0))
+    leftPadding: 10; rightPadding: 10
+    topPadding: 0; bottomPadding: 0
     hoverEnabled: true
-    font.pixelSize: 13
+    font.family: T.sans; font.pixelSize: 13
     Accessible.name: text
-    TextMetrics { id: labelMetrics; text: control.text; font: control.font }
+    TextMetrics { id: labelMetrics; text: control.label; font: control.font }
+    TextMetrics { id: keyMetrics; text: control.keys; font.family: T.mono; font.pixelSize: T.small }
     contentItem: Item {
-        FieldIcon { visible: !!control.glyph; name: control.glyph; width: 18; height: 18; anchors.left: parent.left; anchors.verticalCenter: parent.verticalCenter; tint: !control.enabled ? "#979b91" : control.primary ? "#fffaf2" : "#36574a" }
         Text {
-            anchors.fill: parent; anchors.leftMargin: control.glyph ? 26 : 0
-            text: control.text; font: control.font
-            color: !control.enabled ? "#979b91" : control.primary ? "#fffaf2" : "#293e35"
-            horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; elide: Text.ElideRight
+            anchors.left: parent.left; anchors.right: keyLegend.visible ? keyLegend.left : parent.right
+            anchors.rightMargin: keyLegend.visible ? 10 : 0
+            height: parent.height
+            text: control.label; font: control.font; color: control.labelColour
+            horizontalAlignment: control.keys ? Text.AlignLeft : Text.AlignHCenter
+            verticalAlignment: Text.AlignVCenter; elide: Text.ElideRight
+        }
+        Text {
+            id: keyLegend
+            visible: !!control.keys
+            anchors.right: parent.right; height: parent.height
+            text: control.keys; font.family: T.mono; font.pixelSize: T.small
+            color: T.alpha(control.labelColour, .6); verticalAlignment: Text.AlignVCenter
         }
     }
-    background: Rectangle {
-        radius: 7
-        color: control.primary ? (control.down ? Qt.darker(control.accent, 1.2) : control.accent)
-              : control.down ? "#d9ddd0" : control.hovered ? "#e6e8de" : control.quiet ? "transparent" : "#f8faf6"
-        border.width: control.activeFocus ? 2 : control.quiet || control.primary ? 0 : 1
-        border.color: control.activeFocus ? "#55784c" : "#d4d9cc"
-        opacity: control.enabled ? 1 : 0.55
-    }
+    background: Rectangle { color: control.fill }
 }

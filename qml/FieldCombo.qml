@@ -1,54 +1,64 @@
 pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Controls
+import "Theme.js" as T
+
+// A square field: the value in mono and a chevron. The menu is mono too; the option
+// under the cursor inverts.
 ComboBox {
     id: control
-    property string glyph: ""
-    implicitHeight: 36
+    property bool onBand: false
+    readonly property bool focusFlood: control.visualFocus
+    implicitHeight: 28
     implicitWidth: 180
-    leftPadding: glyph ? 38 : 12
-    rightPadding: 30
-    font.pixelSize: 12
+    leftPadding: 10
+    rightPadding: 26
+    font.family: T.mono; font.pixelSize: T.value
     hoverEnabled: true
     contentItem: Text {
         text: control.displayText
         font: control.font
-        color: control.enabled ? "#293d2b" : "#92988d"
+        color: control.focusFlood ? T.floodInk : !control.enabled ? (control.onBand ? T.bandMuted : T.muted) : control.onBand ? T.bandInk : T.ink
         verticalAlignment: Text.AlignVCenter
         elide: Text.ElideRight
     }
-    FieldIcon { visible: !!control.glyph; name: control.glyph; width: 19; height: 19; x: 12; anchors.verticalCenter: parent.verticalCenter; tint: control.enabled ? "#426354" : "#939f96" }
-    indicator: Text { x: control.width - 23; y: (control.height - height) / 2; text: "⌄"; font.pixelSize: 17; color: "#5c7252" }
+    indicator: Text {
+        x: control.width - 20; y: (control.height - height) / 2
+        visible: control.enabled
+        text: "⌄"; font.family: T.mono; font.pixelSize: 13
+        color: control.focusFlood ? T.floodInk : control.onBand ? T.bandMuted : T.muted
+    }
     background: Rectangle {
-        color: !control.enabled ? "#f0f2e9" : control.hovered ? "#e3eadb" : "#f9fbf7"
-        radius: 7; border.color: control.activeFocus ? "#55784c" : "#d0d9c6"
-        border.width: control.activeFocus ? 2 : 1
+        color: control.focusFlood ? T.accent
+             : control.onBand ? (control.enabled ? (control.hovered || control.popup.visible ? T.alpha(T.bandInk, .14) : T.bandKey) : "transparent")
+             : control.enabled ? (control.hovered || control.popup.visible ? T.dim : T.cell) : "transparent"
     }
     delegate: ItemDelegate {
         id: option
         required property int index
         required property var modelData
-        width: control.popup.width - 12
-        height: 34
+        width: control.popup.width - control.popup.leftPadding - control.popup.rightPadding
+        height: 28
+        leftPadding: 10; rightPadding: 10
         hoverEnabled: true
         Accessible.role: Accessible.MenuItem
         Accessible.name: control.textRole ? modelData[control.textRole] : modelData
         highlighted: control.highlightedIndex === index
         contentItem: Text {
             text: control.textRole ? option.modelData[control.textRole] : option.modelData
-            color: "#293d2b"; font.pixelSize: 12; elide: Text.ElideRight
+            color: option.highlighted || option.hovered ? T.floodInk : control.currentIndex === option.index ? T.ink : T.muted
+            font.family: T.mono; font.pixelSize: T.value; elide: Text.ElideRight
             verticalAlignment: Text.AlignVCenter
-            font.weight: control.currentIndex === option.index ? Font.DemiBold : Font.Normal
         }
-        background: Rectangle { radius: 4; color: option.highlighted || option.hovered ? "#dfe8d5" : "transparent" }
+        background: Rectangle { color: option.highlighted || option.hovered ? T.ink : "transparent" }
     }
     popup: Popup {
-        y: control.height + 4
+        y: control.height
         width: Math.max(control.width, 200)
-        implicitHeight: Math.min(270, menuList.contentHeight + 12)
-        padding: 6
+        implicitHeight: Math.min(300, menuList.contentHeight + topPadding + bottomPadding)
+        padding: 4
         margins: 12
-        background: Rectangle { color: "#fbfcf7"; radius: 7; border.color: "#c8d2be" }
+        background: Rectangle { color: T.cell }
         contentItem: ListView {
             id: menuList
             clip: true
@@ -57,7 +67,7 @@ ComboBox {
             currentIndex: control.highlightedIndex
             boundsBehavior: Flickable.StopAtBounds
             boundsMovement: Flickable.StopAtBounds
-            ScrollBar.vertical: ScrollBar { }
+            ScrollBar.vertical: FieldScrollBar { }
         }
     }
 }

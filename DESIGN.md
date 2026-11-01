@@ -26,8 +26,9 @@ typography:
   readout: { fontFamily: DSEG14 Modern, fontSize: "24–30px" }
 layout:
   corners: "square everywhere"
-  margin: "24"
-  rail: "296"
+  gutter: "6"
+  inset: "18"
+  rail: "290"
 ---
 
 # Design System: Fieldnotes
@@ -65,18 +66,25 @@ Every label is lowercase. User content (note titles, category, workspace and dev
 
 ## Layout
 
-1. **Header:** the section titles on the left; the workspace, and the engine status as a small square, on the right.
-2. **Notes section:**
-   - **Rail on the panel tone:** new note, search, categories, notes.
-   - **Document on the ground:** title, location, copy, the editor and its footer.
-3. **Organise section:** the categories rail and the note table.
-4. **Silver band:** across the full width. It holds:
-   - the readout and its status;
-   - the rec and pause keys;
-   - the live input waveform (the hero visual, on a dot grid) and the level meter;
-   - input, filter and save-to.
+Alignment is the design: every edge sits on a grid line, and the line between tacky and right is a few pixels.
 
-There are no dividers, boxes, radii or shadows. Space and tone steps separate everything.
+### Bars and panels
+
+- **Header:** a band. It has the band's colour and ink, as in Lodo and TapeTop, and runs up through the native title bar. It holds the section titles on the left, and the workspace and engine status on the right.
+- **Body:** panel columns on the ground, 6-unit gutters around and between them:
+  - the rail, 290 wide;
+  - the document, or in organise the categories (also 290) and the note list.
+
+  Content sits 18 units inside each panel. Each panel ends in a cell-tone footer bar, so scrolled content ends on a tone step, and lists size to whole rows.
+- **Band:** the recorder, across the foot.
+
+### Grid lines
+
+- **Left content line (24):** the section titles, the rail's cells and labels, and the band's readout.
+- **Document line (320):** the title, editor tabs, text and footer, and the band's rec key. The readout column spans the rail's content width and stops on its edge.
+- **Right edge (24 in from the window):** the header, document and band end together.
+- **Cells:** text inside a cell sits 10 in from the cell's edge; bare labels sit on the line itself.
+- **Rows:** the document toolbar shares a row with the rail's search field.
 
 ## Components
 

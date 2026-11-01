@@ -17,7 +17,7 @@ ColumnLayout {
     // so the footer bar can span the full width and the text scrolls under a tone step.
     property real leftInset: 0
     property real rightInset: 0
-    property color footerColour: T.p.panel
+    property color footerColour: T.p.cell
     property alias footerItems: footerSlot.data
     property bool preview: false
     property bool allowFocusMode: false

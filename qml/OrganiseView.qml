@@ -114,13 +114,14 @@ Item {
         if (event.matches(StandardKey.SelectAll)) { root.selecting = true; root.controller.selectNotes(root.visibleNotes.map(n => n.id)); event.accepted = true }
         else if (event.key === Qt.Key_Escape) { root.selecting = false; root.controller.clearNoteSelection(); event.accepted = true }
     }
-    ColumnLayout {
-        anchors.fill: parent; anchors.topMargin: 16; spacing: 0
-        RowLayout {
-            Layout.leftMargin: 24; Layout.rightMargin: 24
-            Layout.fillWidth: true; Layout.fillHeight: true; spacing: 24
+    // Two panel columns on the ground, as in the notes section: the same 290-unit rail,
+    // 6-unit gutters and 18-unit insets, so every edge lines up with the header and band.
+    RowLayout {
+        anchors.fill: parent; anchors.margins: 6; spacing: 6
+            Rectangle {
+                Layout.preferredWidth: 290; Layout.fillHeight: true; color: T.p.panel
             ColumnLayout {
-                Layout.preferredWidth: 232; Layout.minimumWidth: 232; Layout.maximumWidth: 232; Layout.fillHeight: true; spacing: 8
+                anchors.fill: parent; anchors.margins: 18; spacing: 8
                 RowLayout {
                     Layout.fillWidth: true
                     Text { text: "categories"; font.family: T.sans; font.pixelSize: 13; color: T.p.muted }
@@ -169,8 +170,14 @@ Item {
                     }
                 }
             }
+            }
+            Rectangle {
+                Layout.fillWidth: true; Layout.fillHeight: true; color: T.p.panel
             ColumnLayout {
-                Layout.fillWidth: true; Layout.fillHeight: true; spacing: 8
+                anchors.fill: parent; spacing: 0
+            ColumnLayout {
+                Layout.fillWidth: true; Layout.fillHeight: true
+                Layout.leftMargin: 18; Layout.rightMargin: 18; Layout.topMargin: 18; spacing: 8
                 RowLayout {
                     Layout.fillWidth: true; spacing: 6
                     FieldText {
@@ -204,11 +211,13 @@ Item {
                     ActionButton { text: "Clear"; quiet: true; enabled: root.controller.selectedNoteIds.length > 0; onClicked: root.controller.clearNoteSelection() }
                     ActionButton { text: "Move"; enabled: root.controller.connected && root.controller.selectedNoteIds.length > 0 && !root.controller.moving; onClicked: root.moveRequested(root.controller.selectedNoteIds) }
                 }
+                Item {
+                    Layout.fillWidth: true; Layout.fillHeight: true
                 ListView {
                     id: files
                     PixelScroll { viewport: files }
                     objectName: "organisedNotes"
-                    Layout.fillWidth: true; Layout.fillHeight: true; clip: true
+                    width: parent.width; height: Math.max(56, Math.floor(parent.height / 56) * 56); clip: true
                     model: root.visibleNotes; boundsBehavior: Flickable.StopAtBounds
                     ScrollBar.vertical: FieldScrollBar { }
                     delegate: ItemDelegate {
@@ -219,7 +228,7 @@ Item {
                         readonly property bool selected: root.controller.selectedNoteIds.indexOf(modelData.id) >= 0
                         readonly property bool inverted: selected || visualFocus
                         readonly property var noteState: T.noteState(modelData)
-                        width: files.width; height: 56; leftPadding: 12; rightPadding: 12; topPadding: 8; bottomPadding: 8; hoverEnabled: true
+                        width: files.width; height: 56; leftPadding: 10; rightPadding: 10; topPadding: 8; bottomPadding: 8; hoverEnabled: true
                         Accessible.role: Accessible.ListItem; Accessible.name: modelData.title; Accessible.selected: selected
                         background: Rectangle { color: file.visualFocus ? T.p.accent : file.selected ? T.p.ink : file.hovered ? T.p.cell : file.index % 2 ? T.p.panel : "transparent" }
                         onClicked: root.activateNote(modelData.id, Qt.NoModifier)
@@ -279,20 +288,22 @@ Item {
                         font.family: T.mono; font.pixelSize: T.value; color: T.p.dim
                     }
                 }
+                }
             }
-        }
-        // A footer bar in the panel tone, so the list scrolls under a tone step.
-        Rectangle {
-            Layout.fillWidth: true; Layout.preferredHeight: 44; color: T.p.panel
+            // The footer bar steps up to the cell tone, so the list ends on a tone change.
+            Rectangle {
+                Layout.fillWidth: true; Layout.preferredHeight: 44; color: T.p.cell
         RowLayout {
-            anchors.fill: parent; anchors.leftMargin: 24; anchors.rightMargin: 24; spacing: 8
+            anchors.fill: parent; anchors.leftMargin: 18; anchors.rightMargin: 18; spacing: 8
             Rectangle { visible: !!root.controller.error || !!root.notice; Layout.preferredWidth: 6; Layout.preferredHeight: 6; color: root.controller.error ? T.p.magenta : T.p.ink }
             Text { visible: !root.controller.error && !root.notice; text: "notes"; color: T.p.muted; font.family: T.sans; font.pixelSize: 12 }
             Text { Layout.fillWidth: true; text: T.lower(root.controller.error || root.notice) || root.visibleNotes.length; color: root.controller.error ? T.p.ink : T.p.muted; font.family: T.mono; font.pixelSize: T.value; elide: Text.ElideRight }
             ActionButton { visible: !!root.controller.error; text: "Dismiss"; quiet: true; implicitHeight: 22; onClicked: root.controller.dismissError() }
             ActionButton { text: "New note"; keys: "⌘N"; enabled: root.controller.connected; onClicked: root.newNote(root.category === "*" ? "" : root.category) }
         }
-        }
+            }
+            }
+            }
     }
     FieldMenu {
         id: fileMenu
@@ -346,7 +357,7 @@ Item {
     Drawer {
         id: editDrawer
         edge: Qt.RightEdge; width: Math.min(520, root.width - 48); height: root.height
-        modal: true; leftPadding: 24; rightPadding: 20; topPadding: 16; bottomPadding: 16
+        modal: true; leftPadding: 18; rightPadding: 18; topPadding: 18; bottomPadding: 18
         onOpened: if (!root.controller.body && root.controller.editable) editBody.focusEditor()
         onClosed: { root.editTarget = ""; root.creatingNote = false }
         background: Rectangle { color: T.p.panel }

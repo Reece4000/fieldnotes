@@ -336,12 +336,12 @@ ApplicationWindow {
     ColumnLayout {
         anchors.fill: parent; spacing: 0
 
-        // The header bar is the panel tone, like the rail, and runs up through the native
-        // title bar above the safe area.
+        // The header is a band, as in Lodo and TapeTop: the band's colour and ink, running up
+        // through the native title bar above the safe area.
         Rectangle {
-            Layout.fillWidth: true; Layout.preferredHeight: 52
-            color: T.p.panel
-            Rectangle { anchors.bottom: parent.top; width: parent.width; height: 200; color: T.p.panel }
+            Layout.fillWidth: true; Layout.preferredHeight: 56
+            color: T.p.band
+            Rectangle { anchors.bottom: parent.top; width: parent.width; height: 200; color: T.p.band }
             RowLayout {
                 id: header
                 anchors.fill: parent; anchors.leftMargin: 24; anchors.rightMargin: 24
@@ -356,7 +356,7 @@ ApplicationWindow {
                         readonly property bool dropping: modelData === "trash" && trashDrop.containsDrag
                         text: modelData
                         font.family: T.sans; font.pixelSize: T.section
-                        color: dropping ? T.p.floodInk : current ? T.p.ink : sectionHover.hovered ? T.alpha(T.p.ink, .7) : T.p.dim
+                        color: dropping ? T.p.floodInk : current ? T.p.bandInk : sectionHover.hovered ? T.alpha(T.p.bandInk, .75) : T.p.bandMuted
                         Accessible.role: Accessible.PageTab; Accessible.name: modelData; Accessible.selected: current
                         Rectangle { visible: sectionTitle.dropping; z: -1; anchors.fill: parent; anchors.margins: -4; color: T.p.accent }
                         HoverHandler { id: sectionHover; cursorShape: Qt.PointingHandCursor }
@@ -372,9 +372,10 @@ ApplicationWindow {
                     }
                 }
                 Item { Layout.fillWidth: true }
-                Text { text: "workspace"; color: T.p.ink; font.family: T.sans; font.pixelSize: T.label }
+                Text { text: "workspace"; color: T.p.bandInk; font.family: T.sans; font.pixelSize: T.label }
                 FieldCombo {
                     id: workspacePicker
+                    onBand: true
                     Layout.preferredWidth: window.width < 1000 ? 150 : 200
                     model: window.c.workspaces; textRole: "name"
                     currentIndex: Math.max(0, window.c.workspaces.findIndex(n => n.id === window.chosenWorkspace))
@@ -382,15 +383,15 @@ ApplicationWindow {
                     onActivated: window.chosenWorkspace = model[currentIndex].id
                     MouseArea { anchors.fill: parent; acceptedButtons: Qt.RightButton; onPressed: mouse => workspaceMenu.popup(workspacePicker, mouse.x, mouse.y) }
                 }
-                ActionButton { text: "+"; quiet: true; Layout.leftMargin: -20; Accessible.name: "New workspace"; onClicked: window.create("workspace") }
+                ActionButton { text: "+"; quiet: true; onBand: true; Layout.leftMargin: -20; Accessible.name: "New workspace"; onClicked: window.create("workspace") }
                 Row {
                     spacing: 8
                     Rectangle {
                         anchors.verticalCenter: parent.verticalCenter; width: 8; height: 8
-                        color: window.c.engineStatus === "ready" ? T.p.ink : window.c.engineStatus === "error" ? T.p.magenta : T.p.amber
+                        color: window.c.engineStatus === "ready" ? T.p.bandInk : window.c.engineStatus === "error" ? T.p.magenta : T.p.amber
                     }
                     Text {
-                        text: "phonon-2"; font.family: T.mono; font.pixelSize: T.value; color: T.p.muted
+                        text: "phonon-2"; font.family: T.mono; font.pixelSize: T.value; color: T.p.bandMuted
                         ToolTip.visible: engineHover.hovered && window.c.engineStatus === "error"; ToolTip.text: T.lower(window.c.engineError)
                         HoverHandler { id: engineHover }
                     }
@@ -402,12 +403,11 @@ ApplicationWindow {
             Layout.fillWidth: true; Layout.fillHeight: true
 
             RowLayout {
-                anchors.fill: parent; spacing: 0; visible: !window.organising
+                anchors.fill: parent; anchors.margins: 6; spacing: 6; visible: !window.organising
                 Rectangle {
-                    Layout.preferredWidth: 296; Layout.fillHeight: true; color: T.p.panel
+                    Layout.preferredWidth: 290; Layout.fillHeight: true; color: T.p.panel
                     ColumnLayout {
-                        anchors.fill: parent; anchors.leftMargin: 24; anchors.rightMargin: 24
-                        anchors.topMargin: window.height < 700 ? 12 : 16; anchors.bottomMargin: window.height < 700 ? 12 : 16
+                        anchors.fill: parent; anchors.margins: 18
                         spacing: window.height < 700 ? 8 : 12
                         ActionButton { text: "New note"; keys: "⌘N"; Layout.fillWidth: true; enabled: window.c.connected; onClicked: window.newNote() }
                         FieldText {
@@ -466,10 +466,15 @@ ApplicationWindow {
                             ActionButton { text: "All"; quiet: true; Accessible.name: noteList.count < window.c.total ? "Select all loaded notes" : "Select all notes"; onClicked: window.c.selectAllNotes() }
                             ActionButton { text: "Move"; enabled: window.c.connected && window.c.selectedNoteIds.length > 0 && !window.c.moving; onClicked: window.openMove(window.c.selectedNoteIds, window.chosenWorkspace) }
                         }
+                        // The list shows whole rows only: its height snaps to the row pitch, and the
+                        // last row ends on the panel's edge rather than half-cut above blank space.
+                        Item {
+                            id: noteListFrame
+                            Layout.fillWidth: true; Layout.fillHeight: true; Layout.minimumHeight: 52
                         ListView {
                             id: noteList
                             PixelScroll { viewport: noteList }
-                            Layout.fillWidth: true; Layout.fillHeight: true; Layout.minimumHeight: 52; clip: true; spacing: 0
+                            width: parent.width; height: Math.max(52, Math.floor(parent.height / 52) * 52); clip: true; spacing: 0
                             model: window.c.notes
                             boundsBehavior: Flickable.StopAtBounds; boundsMovement: Flickable.StopAtBounds
                             ScrollBar.vertical: FieldScrollBar { }
@@ -574,15 +579,19 @@ ApplicationWindow {
                             Text { anchors.centerIn: parent; text: searchField.text ? "no matches" : window.trash ? "trash is empty" : "no notes"; color: T.p.dim; font.family: T.mono; font.pixelSize: T.value; visible: !noteList.count }
                             MouseArea { anchors.fill: parent; enabled: !noteList.count; acceptedButtons: Qt.RightButton; onPressed: mouse => workspaceMenu.popup(noteList, mouse.x, mouse.y) }
                         }
+                        }
                     }
                 }
+                Rectangle {
+                    Layout.fillWidth: true; Layout.fillHeight: true; color: T.p.panel
                 ColumnLayout {
                     id: mainPane
-                    readonly property real leftInset: window.width < 1000 ? 20 : 32
-                    readonly property real rightInset: 24
-                    Layout.fillWidth: true; Layout.fillHeight: true
-                    Layout.topMargin: 16
-                    spacing: 12
+                    anchors.fill: parent
+                    readonly property real leftInset: 18
+                    readonly property real rightInset: 18
+                    anchors.topMargin: 18
+                    // Title then toolbar: 36 + 4 puts the toolbar on the rail's search row (18 + 28 + 12).
+                    spacing: 4
                     RowLayout {
                         Layout.fillWidth: true; Layout.leftMargin: mainPane.leftInset; Layout.rightMargin: mainPane.rightInset; spacing: 2
                         TextField {
@@ -666,6 +675,7 @@ ApplicationWindow {
                         leftInset: mainPane.leftInset; rightInset: mainPane.rightInset
                         readonly property string message: window.c.error || (window.c.engineStatus === "error" ? window.c.engineError || "transcription failed" : window.notice || (window.c.pending && !window.c.recording ? "finishing transcription" : ""))
                         readonly property bool failing: !!window.c.error || window.c.engineStatus === "error"
+                        footerColour: T.p.cell
                         footerItems: [
                             Rectangle { visible: !!noteEditor.message; Layout.preferredWidth: 6; Layout.preferredHeight: 6; color: noteEditor.failing ? T.p.magenta : window.notice ? T.p.ink : T.p.amber },
                             Text {
@@ -680,6 +690,7 @@ ApplicationWindow {
                             ActionButton { text: "Dismiss"; implicitHeight: 22; quiet: true; visible: !!window.c.error; onClicked: window.c.dismissError() }
                         ]
                     }
+                }
                 }
             }
             OrganiseView {
@@ -710,6 +721,9 @@ ApplicationWindow {
         }
         RecordingConsole {
             visible: !window.focusedWriting
+            // The band's first column spans the rail's content and its keys start on the
+            // document's text edge: 6 gutter + 18 inset on the left, rail 290 wide.
+            leadWidth: 290 - 36; leadGap: 18 + 6 + 18
             Layout.fillWidth: true; Layout.preferredHeight: implicitHeight
             controller: window.c; compact: window.height < 760
             reduceMotion: window.reducedMotion; motionActive: window.active && window.visibility !== Window.Minimized

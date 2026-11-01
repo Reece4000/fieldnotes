@@ -16,6 +16,9 @@ Rectangle {
     property string destinationCategory: ""
     property string destinationWorkspace: "inbox"
     property double voiceDb: -72
+    // Column alignment with the panels above: the first column's width and the gap after it.
+    property real leadWidth: 212
+    property real leadGap: 24
     readonly property bool narrow: width < 1040
     readonly property bool capturing: controller.recording && !controller.stopping
     readonly property real inner: height - 2 * margin
@@ -38,7 +41,8 @@ Rectangle {
         spacing: recorderConsole.gap
 
         ColumnLayout {
-            Layout.preferredWidth: recorderConsole.narrow ? 168 : 212; Layout.fillHeight: true
+            Layout.preferredWidth: recorderConsole.leadWidth; Layout.fillHeight: true
+            Layout.rightMargin: recorderConsole.leadGap - recorderConsole.gap
             spacing: 0
             Readout {
                 Layout.fillWidth: true
@@ -125,7 +129,7 @@ Rectangle {
         }
 
         ColumnLayout {
-            Layout.preferredWidth: recorderConsole.narrow ? 220 : 300; Layout.fillHeight: true
+            Layout.preferredWidth: recorderConsole.narrow ? 190 : 300; Layout.fillHeight: true
             spacing: 0
             RowLayout {
                 Layout.fillWidth: true; Layout.preferredHeight: recorderConsole.rowHeight; spacing: 0

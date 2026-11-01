@@ -336,58 +336,64 @@ ApplicationWindow {
     ColumnLayout {
         anchors.fill: parent; spacing: 0
 
-        RowLayout {
-            id: header
+        // The header bar is the panel tone, like the rail, and runs up through the native
+        // title bar above the safe area.
+        Rectangle {
             Layout.fillWidth: true; Layout.preferredHeight: 52
-            Layout.leftMargin: 24; Layout.rightMargin: 24
-            spacing: 22
-            Repeater {
-                model: ["notes", "organise", "trash"]
-                Text {
-                    id: sectionTitle
-                    required property string modelData
-                    required property int index
-                    readonly property bool current: window.section === modelData
-                    readonly property bool dropping: modelData === "trash" && trashDrop.containsDrag
-                    text: modelData
-                    font.family: T.sans; font.pixelSize: T.section
-                    color: dropping ? T.p.floodInk : current ? T.p.ink : sectionHover.hovered ? T.alpha(T.p.ink, .7) : T.p.dim
-                    Accessible.role: Accessible.PageTab; Accessible.name: modelData; Accessible.selected: current
-                    Rectangle { visible: sectionTitle.dropping; z: -1; anchors.fill: parent; anchors.margins: -4; color: T.p.accent }
-                    HoverHandler { id: sectionHover; cursorShape: Qt.PointingHandCursor }
-                    TapHandler { onTapped: window.chooseSection(sectionTitle.modelData) }
-                    DropArea {
-                        id: trashDrop
-                        anchors.fill: parent; anchors.margins: -8; enabled: sectionTitle.modelData === "trash"; keys: ["fieldnotes-note"]
-                        onEntered: drag => { drag.accepted = drag.source === noteDragGhost && !!noteDragGhost.noteId }
-                        onDropped: drop => {
-                            if (drop.source === noteDragGhost && noteDragGhost.noteId) { window.c.trashNote(noteDragGhost.noteId); drop.accept(Qt.MoveAction) }
+            color: T.p.panel
+            Rectangle { anchors.bottom: parent.top; width: parent.width; height: 200; color: T.p.panel }
+            RowLayout {
+                id: header
+                anchors.fill: parent; anchors.leftMargin: 24; anchors.rightMargin: 24
+                spacing: 22
+                Repeater {
+                    model: ["notes", "organise", "trash"]
+                    Text {
+                        id: sectionTitle
+                        required property string modelData
+                        required property int index
+                        readonly property bool current: window.section === modelData
+                        readonly property bool dropping: modelData === "trash" && trashDrop.containsDrag
+                        text: modelData
+                        font.family: T.sans; font.pixelSize: T.section
+                        color: dropping ? T.p.floodInk : current ? T.p.ink : sectionHover.hovered ? T.alpha(T.p.ink, .7) : T.p.dim
+                        Accessible.role: Accessible.PageTab; Accessible.name: modelData; Accessible.selected: current
+                        Rectangle { visible: sectionTitle.dropping; z: -1; anchors.fill: parent; anchors.margins: -4; color: T.p.accent }
+                        HoverHandler { id: sectionHover; cursorShape: Qt.PointingHandCursor }
+                        TapHandler { onTapped: window.chooseSection(sectionTitle.modelData) }
+                        DropArea {
+                            id: trashDrop
+                            anchors.fill: parent; anchors.margins: -8; enabled: sectionTitle.modelData === "trash"; keys: ["fieldnotes-note"]
+                            onEntered: drag => { drag.accepted = drag.source === noteDragGhost && !!noteDragGhost.noteId }
+                            onDropped: drop => {
+                                if (drop.source === noteDragGhost && noteDragGhost.noteId) { window.c.trashNote(noteDragGhost.noteId); drop.accept(Qt.MoveAction) }
+                            }
                         }
                     }
                 }
-            }
-            Item { Layout.fillWidth: true }
-            Text { text: "workspace"; color: T.p.ink; font.family: T.sans; font.pixelSize: T.label }
-            FieldCombo {
-                id: workspacePicker
-                Layout.preferredWidth: window.width < 1000 ? 150 : 200
-                model: window.c.workspaces; textRole: "name"
-                currentIndex: Math.max(0, window.c.workspaces.findIndex(n => n.id === window.chosenWorkspace))
-                Accessible.name: "Workspace"
-                onActivated: window.chosenWorkspace = model[currentIndex].id
-                MouseArea { anchors.fill: parent; acceptedButtons: Qt.RightButton; onPressed: mouse => workspaceMenu.popup(workspacePicker, mouse.x, mouse.y) }
-            }
-            ActionButton { text: "+"; quiet: true; Layout.leftMargin: -20; Accessible.name: "New workspace"; onClicked: window.create("workspace") }
-            Row {
-                spacing: 8
-                Rectangle {
-                    anchors.verticalCenter: parent.verticalCenter; width: 8; height: 8
-                    color: window.c.engineStatus === "ready" ? T.p.ink : window.c.engineStatus === "error" ? T.p.magenta : T.p.amber
+                Item { Layout.fillWidth: true }
+                Text { text: "workspace"; color: T.p.ink; font.family: T.sans; font.pixelSize: T.label }
+                FieldCombo {
+                    id: workspacePicker
+                    Layout.preferredWidth: window.width < 1000 ? 150 : 200
+                    model: window.c.workspaces; textRole: "name"
+                    currentIndex: Math.max(0, window.c.workspaces.findIndex(n => n.id === window.chosenWorkspace))
+                    Accessible.name: "Workspace"
+                    onActivated: window.chosenWorkspace = model[currentIndex].id
+                    MouseArea { anchors.fill: parent; acceptedButtons: Qt.RightButton; onPressed: mouse => workspaceMenu.popup(workspacePicker, mouse.x, mouse.y) }
                 }
-                Text {
-                    text: "phonon-2"; font.family: T.mono; font.pixelSize: T.value; color: T.p.muted
-                    ToolTip.visible: engineHover.hovered && window.c.engineStatus === "error"; ToolTip.text: T.lower(window.c.engineError)
-                    HoverHandler { id: engineHover }
+                ActionButton { text: "+"; quiet: true; Layout.leftMargin: -20; Accessible.name: "New workspace"; onClicked: window.create("workspace") }
+                Row {
+                    spacing: 8
+                    Rectangle {
+                        anchors.verticalCenter: parent.verticalCenter; width: 8; height: 8
+                        color: window.c.engineStatus === "ready" ? T.p.ink : window.c.engineStatus === "error" ? T.p.magenta : T.p.amber
+                    }
+                    Text {
+                        text: "phonon-2"; font.family: T.mono; font.pixelSize: T.value; color: T.p.muted
+                        ToolTip.visible: engineHover.hovered && window.c.engineStatus === "error"; ToolTip.text: T.lower(window.c.engineError)
+                        HoverHandler { id: engineHover }
+                    }
                 }
             }
         }
@@ -572,12 +578,13 @@ ApplicationWindow {
                 }
                 ColumnLayout {
                     id: mainPane
+                    readonly property real leftInset: window.width < 1000 ? 20 : 32
+                    readonly property real rightInset: 24
                     Layout.fillWidth: true; Layout.fillHeight: true
-                    Layout.leftMargin: window.width < 1000 ? 20 : 32; Layout.rightMargin: window.width < 1000 ? 16 : 24
-                    Layout.topMargin: 8; Layout.bottomMargin: 12
+                    Layout.topMargin: 16
                     spacing: 12
                     RowLayout {
-                        Layout.fillWidth: true; spacing: 2
+                        Layout.fillWidth: true; Layout.leftMargin: mainPane.leftInset; Layout.rightMargin: mainPane.rightInset; spacing: 2
                         TextField {
                             id: titleField
                             Layout.fillWidth: true; Layout.minimumWidth: 80; implicitHeight: 36
@@ -590,7 +597,7 @@ ApplicationWindow {
                             Accessible.name: "Note title"
                             TextContextMenu { field: titleField }
                             onTextEdited: if (!window.syncing) window.c.updateTitle(text)
-                            background: Rectangle { anchors.fill: parent; anchors.leftMargin: -12; color: "transparent"; border.width: titleField.activeFocus ? 1 : 0; border.color: T.p.accent }
+                            background: Item { }
                             Text {
                                 anchors.fill: parent; visible: !titleField.activeFocus
                                 text: titleField.text; font: titleField.font; color: T.p.ink
@@ -656,22 +663,22 @@ ApplicationWindow {
                         onFocusModeRequested: window.focusedWriting = !window.focusedWriting
                         placeholderText: !window.c.selectedId ? "" : window.c.noteStatus === "recording" || window.c.noteStatus === "paused" ? "listening" : window.c.pending ? "transcribing" : ""
                         onEdited: value => window.c.updateBody(value)
-                    }
-                    RowLayout {
-                        Layout.fillWidth: true; Layout.preferredHeight: 22; spacing: 8
+                        leftInset: mainPane.leftInset; rightInset: mainPane.rightInset
                         readonly property string message: window.c.error || (window.c.engineStatus === "error" ? window.c.engineError || "transcription failed" : window.notice || (window.c.pending && !window.c.recording ? "finishing transcription" : ""))
                         readonly property bool failing: !!window.c.error || window.c.engineStatus === "error"
-                        Rectangle { visible: !!parent.message; Layout.preferredWidth: 6; Layout.preferredHeight: 6; color: parent.failing ? T.p.magenta : window.notice ? T.p.ink : T.p.amber }
-                        Text {
-                            Layout.fillWidth: true
-                            text: T.lower(parent.message)
-                            color: parent.failing ? T.p.ink : T.p.muted; font.family: T.mono; font.pixelSize: T.value; elide: Text.ElideRight
-                            ToolTip.visible: statusHover.hovered && truncated; ToolTip.text: text
-                            HoverHandler { id: statusHover }
-                        }
-                        ActionButton { text: "Undo"; implicitHeight: 22; quiet: true; visible: !!window.notice && window.undoVisible; onClicked: { window.c.undoDelete(); window.notice = "" } }
-                        ActionButton { text: "Retry"; implicitHeight: 22; quiet: true; visible: window.c.engineStatus === "error"; onClicked: window.c.retry() }
-                        ActionButton { text: "Dismiss"; implicitHeight: 22; quiet: true; visible: !!window.c.error; onClicked: window.c.dismissError() }
+                        footerItems: [
+                            Rectangle { visible: !!noteEditor.message; Layout.preferredWidth: 6; Layout.preferredHeight: 6; color: noteEditor.failing ? T.p.magenta : window.notice ? T.p.ink : T.p.amber },
+                            Text {
+                                Layout.fillWidth: true
+                                text: T.lower(noteEditor.message)
+                                color: noteEditor.failing ? T.p.ink : T.p.muted; font.family: T.mono; font.pixelSize: T.value; elide: Text.ElideRight
+                                ToolTip.visible: statusHover.hovered && truncated; ToolTip.text: text
+                                HoverHandler { id: statusHover }
+                            },
+                            ActionButton { text: "Undo"; implicitHeight: 22; quiet: true; visible: !!window.notice && window.undoVisible; onClicked: { window.c.undoDelete(); window.notice = "" } },
+                            ActionButton { text: "Retry"; implicitHeight: 22; quiet: true; visible: window.c.engineStatus === "error"; onClicked: window.c.retry() },
+                            ActionButton { text: "Dismiss"; implicitHeight: 22; quiet: true; visible: !!window.c.error; onClicked: window.c.dismissError() }
+                        ]
                     }
                 }
             }

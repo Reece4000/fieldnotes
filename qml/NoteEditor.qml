@@ -13,6 +13,12 @@ ColumnLayout {
     property string accessibleName: "Note editor"
     property string statusText: ""
     property color statusColour: "transparent"
+    // The editor fills its pane edge to edge; the insets keep the text on the pane's grid,
+    // so the footer bar can span the full width and the text scrolls under a tone step.
+    property real leftInset: 0
+    property real rightInset: 0
+    property color footerColour: T.p.panel
+    property alias footerItems: footerSlot.data
     property bool preview: false
     property bool allowFocusMode: false
     property bool focusedWriting: false
@@ -23,7 +29,7 @@ ColumnLayout {
     readonly property int wordCount: text.trim() ? text.trim().split(/\s+/).length : 0
     signal edited(string value)
     signal focusModeRequested()
-    spacing: 6
+    spacing: 0
 
     function loadDocument(id, value) {
         let changed = documentId !== id
@@ -109,14 +115,14 @@ ColumnLayout {
     }
 
     RowLayout {
-        Layout.fillWidth: true; spacing: 2
+        Layout.fillWidth: true; Layout.leftMargin: root.leftInset; Layout.rightMargin: root.rightInset; spacing: 2
         ActionButton {
-            text: "Write"; highlighted: !root.preview; quiet: root.preview; enabled: !!root.documentId
+            text: "Write"; highlighted: !root.preview; flooded: !root.preview && source.activeFocus; quiet: root.preview; enabled: !!root.documentId
             Accessible.name: "Write Markdown"; Accessible.checkable: true; Accessible.checked: !root.preview
             onClicked: root.focusEditor()
         }
         ActionButton {
-            text: "Preview"; highlighted: root.preview; quiet: !root.preview; enabled: !!root.documentId
+            text: "Preview"; highlighted: root.preview; flooded: root.preview && rendered.activeFocus; quiet: !root.preview; enabled: !!root.documentId
             Accessible.name: "Preview Markdown"; Accessible.checkable: true; Accessible.checked: root.preview
             onClicked: { root.preview = true; root.searchVisible = false; rendered.forceActiveFocus() }
         }
@@ -150,7 +156,8 @@ ColumnLayout {
         ActionButton { text: "Find"; keys: "⌘F"; quiet: true; enabled: !!root.text; onClicked: root.focusSearch() }
     }
     RowLayout {
-        Layout.fillWidth: true; visible: root.searchVisible; spacing: 2
+        Layout.fillWidth: true; Layout.leftMargin: root.leftInset; Layout.rightMargin: root.rightInset; Layout.topMargin: 6
+        visible: root.searchVisible; spacing: 2
         FieldText {
             id: searchField
             Layout.fillWidth: true
@@ -170,12 +177,6 @@ ColumnLayout {
     }
     Item {
         Layout.fillWidth: true; Layout.fillHeight: true; Layout.minimumHeight: 36; Layout.topMargin: 6
-        // The text is bare content, so the cursor frames it rather than flooding it.
-        Rectangle {
-            anchors.fill: parent; anchors.leftMargin: -12; anchors.rightMargin: -2
-            color: "transparent"; border.width: 1
-            border.color: source.activeFocus || rendered.activeFocus ? T.p.accent : "transparent"
-        }
         Flickable {
             id: sourceView
             objectName: "noteScroll"
@@ -190,7 +191,7 @@ ColumnLayout {
                 textFormat: TextEdit.PlainText; wrapMode: TextEdit.Wrap; selectByMouse: true; persistentSelection: true
                 readOnly: root.readOnly; font.family: T.sans; font.pixelSize: 15; color: T.p.ink
                 selectionColor: T.alpha(T.p.accent, .38); selectedTextColor: T.p.ink; placeholderTextColor: T.p.muted
-                leftPadding: 0; rightPadding: 14; topPadding: 10; bottomPadding: 24
+                leftPadding: root.leftInset; rightPadding: root.rightInset; topPadding: 10; bottomPadding: 24
                 placeholderText: T.lower(root.placeholderText); Accessible.name: root.accessibleName
                 onTextChanged: if (!root.syncing && !root.readOnly) root.edited(text)
                 onCursorRectangleChanged: root.revealCursor()
@@ -214,7 +215,7 @@ ColumnLayout {
                 textFormat: TextEdit.MarkdownText; readOnly: true; selectByMouse: true; wrapMode: TextEdit.Wrap
                 font.family: T.sans; font.pixelSize: 15; color: T.p.ink
                 selectionColor: T.alpha(T.p.accent, .38); selectedTextColor: T.p.ink
-                leftPadding: 0; rightPadding: 14; topPadding: 10; bottomPadding: 24
+                leftPadding: root.leftInset; rightPadding: root.rightInset; topPadding: 10; bottomPadding: 24
                 placeholderText: "nothing to preview"; placeholderTextColor: T.p.muted
                 Accessible.name: "Markdown preview"
                 onLinkActivated: link => { if (/^https?:\/\//i.test(link) || /^mailto:/i.test(link)) Qt.openUrlExternally(link) }
@@ -223,13 +224,17 @@ ColumnLayout {
             }
         }
     }
-    RowLayout {
-        Layout.fillWidth: true; Layout.preferredHeight: 20; spacing: 6
-        Text { text: "words"; font.family: T.sans; font.pixelSize: 12; color: T.p.muted }
-        Text { text: root.wordCount; font.family: T.mono; font.pixelSize: T.value; color: T.p.ink }
-        Item { Layout.fillWidth: true }
-        Rectangle { visible: root.statusColour.a > 0 && !!root.statusText; Layout.preferredWidth: 6; Layout.preferredHeight: 6; color: root.statusColour }
-        Text { text: T.lower(root.statusText || (root.preview ? "preview" : root.readOnly ? "read only" : "markdown")); font.family: T.mono; font.pixelSize: T.value; color: T.p.muted }
+    Rectangle {
+        Layout.fillWidth: true; Layout.preferredHeight: 34
+        color: root.footerColour
+        RowLayout {
+            anchors.fill: parent; anchors.leftMargin: root.leftInset; anchors.rightMargin: root.rightInset; spacing: 6
+            Text { text: "words"; font.family: T.sans; font.pixelSize: 12; color: T.p.muted }
+            Text { text: root.wordCount; font.family: T.mono; font.pixelSize: T.value; color: T.p.ink }
+            RowLayout { id: footerSlot; Layout.fillWidth: true; Layout.leftMargin: 18; spacing: 8 }
+            Rectangle { visible: root.statusColour.a > 0 && !!root.statusText; Layout.preferredWidth: 6; Layout.preferredHeight: 6; color: root.statusColour }
+            Text { text: T.lower(root.statusText || (root.preview ? "preview" : root.readOnly ? "read only" : "markdown")); font.family: T.mono; font.pixelSize: T.value; color: T.p.muted }
+        }
     }
     Shortcut { sequence: "Meta+B"; enabled: source.activeFocus && !root.readOnly && !root.preview; onActivated: root.wrap("**", "**", "bold text") }
     Shortcut { sequence: "Meta+I"; enabled: source.activeFocus && !root.readOnly && !root.preview; onActivated: root.wrap("*", "*", "italic text") }

@@ -12,8 +12,10 @@ Button {
     property string keys: ""
     // Labels are lowercase; user content (names, titles) keeps its case.
     property bool lowercase: true
+    // Floods with the accent while the thing it names holds the cursor (the write tab while typing).
+    property bool flooded: false
     readonly property string label: lowercase ? T.lower(text) : text
-    readonly property bool focusFlood: control.visualFocus || (control.activeFocus && control.focusReason === Qt.TabFocusReason)
+    readonly property bool focusFlood: control.flooded || control.visualFocus || (control.activeFocus && control.focusReason === Qt.TabFocusReason)
     readonly property color fill: !control.enabled ? (control.quiet ? "transparent" : control.onBand ? T.alpha(T.p.bandKey, .5) : T.p.panel)
         : control.focusFlood ? T.p.accent
         : control.down || control.highlighted ? (control.onBand ? T.p.bandInk : T.p.ink)

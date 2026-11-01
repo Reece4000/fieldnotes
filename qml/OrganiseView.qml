@@ -115,8 +115,9 @@ Item {
         else if (event.key === Qt.Key_Escape) { root.selecting = false; root.controller.clearNoteSelection(); event.accepted = true }
     }
     ColumnLayout {
-        anchors.fill: parent; anchors.leftMargin: 24; anchors.rightMargin: 24; anchors.topMargin: 8; anchors.bottomMargin: 12; spacing: 12
+        anchors.fill: parent; anchors.topMargin: 16; spacing: 0
         RowLayout {
+            Layout.leftMargin: 24; Layout.rightMargin: 24
             Layout.fillWidth: true; Layout.fillHeight: true; spacing: 24
             ColumnLayout {
                 Layout.preferredWidth: 232; Layout.minimumWidth: 232; Layout.maximumWidth: 232; Layout.fillHeight: true; spacing: 8
@@ -280,14 +281,17 @@ Item {
                 }
             }
         }
+        // A footer bar in the panel tone, so the list scrolls under a tone step.
+        Rectangle {
+            Layout.fillWidth: true; Layout.preferredHeight: 44; color: T.p.panel
         RowLayout {
-            Layout.fillWidth: true
-            Layout.preferredHeight: 22; spacing: 8
+            anchors.fill: parent; anchors.leftMargin: 24; anchors.rightMargin: 24; spacing: 8
             Rectangle { visible: !!root.controller.error || !!root.notice; Layout.preferredWidth: 6; Layout.preferredHeight: 6; color: root.controller.error ? T.p.magenta : T.p.ink }
             Text { visible: !root.controller.error && !root.notice; text: "notes"; color: T.p.muted; font.family: T.sans; font.pixelSize: 12 }
             Text { Layout.fillWidth: true; text: T.lower(root.controller.error || root.notice) || root.visibleNotes.length; color: root.controller.error ? T.p.ink : T.p.muted; font.family: T.mono; font.pixelSize: T.value; elide: Text.ElideRight }
             ActionButton { visible: !!root.controller.error; text: "Dismiss"; quiet: true; implicitHeight: 22; onClicked: root.controller.dismissError() }
             ActionButton { text: "New note"; keys: "⌘N"; enabled: root.controller.connected; onClicked: root.newNote(root.category === "*" ? "" : root.category) }
+        }
         }
     }
     FieldMenu {
@@ -357,7 +361,7 @@ Item {
                     selectionColor: T.alpha(T.p.accent, .38); selectedTextColor: T.p.ink
                     Accessible.name: "Organise note title"; readOnly: root.controller.trashed
                     onTextEdited: if (!root.syncing) root.controller.updateTitle(text)
-                    background: Rectangle { anchors.fill: parent; anchors.leftMargin: -12; color: "transparent"; border.width: editTitle.activeFocus ? 1 : 0; border.color: T.p.accent }
+                    background: Item { }
                     Text { anchors.fill: parent; visible: !editTitle.activeFocus; text: editTitle.text; font: editTitle.font; color: T.p.ink; verticalAlignment: Text.AlignVCenter; elide: Text.ElideRight }
                     TextContextMenu { field: editTitle }
                 }
@@ -377,6 +381,7 @@ Item {
                 id: editBody
                 Layout.fillWidth: true; Layout.fillHeight: true
                 readOnly: !root.controller.editable; accessibleName: "Organise note editor"
+                footerColour: T.p.cell; leftInset: 10; rightInset: 10
                 placeholderText: root.controller.editable ? "" : "transcribing"
                 onEdited: value => { if (editDrawer.visible) root.controller.updateBody(value) }
                 statusText: root.controller.error ? "" : root.controller.saving ? "saving" : root.controller.editable ? "saved" : "transcribing"

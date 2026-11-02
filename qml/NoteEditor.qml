@@ -19,16 +19,19 @@ ColumnLayout {
     property real rightInset: 0
     property color footerColour: T.p.cell
     property alias footerItems: footerSlot.data
+    // The header block holds the toolbar and anything put above it (the note title). A tone
+    // makes it a bar like the footer, and the text scrolls under it.
+    property color headerColour: "transparent"
+    property real headerPadding: 0
+    property alias headerItems: headerSlot.data
+    readonly property bool onCell: headerColour.a > 0
     property bool preview: false
-    property bool allowFocusMode: false
-    property bool focusedWriting: false
     property string documentId: ""
     property bool syncing: false
     property bool searchVisible: false
     property int findPosition: -1
     readonly property int wordCount: text.trim() ? text.trim().split(/\s+/).length : 0
     signal edited(string value)
-    signal focusModeRequested()
     spacing: 0
 
     function loadDocument(id, value) {
@@ -53,6 +56,8 @@ ColumnLayout {
             if (changed) previewView.contentY = 0
         })
     }
+    function scrollY() { return sourceView.contentY }
+    function setScrollY(y) { sourceView.contentY = Math.max(0, Math.min(y, sourceView.contentHeight - sourceView.height)) }
     function focusEditor() { preview = false; source.forceActiveFocus() }
     function focusedEditor() { return preview ? rendered : source }
     function togglePreview() {
@@ -114,69 +119,78 @@ ColumnLayout {
         replace(start, end, value, urlStart, urlStart + 8)
     }
 
-    RowLayout {
-        Layout.fillWidth: true; Layout.leftMargin: root.leftInset; Layout.rightMargin: root.rightInset; spacing: 2
-        ActionButton {
-            text: "Write"; highlighted: !root.preview; flooded: !root.preview && source.activeFocus; quiet: root.preview; enabled: !!root.documentId
-            Accessible.name: "Write Markdown"; Accessible.checkable: true; Accessible.checked: !root.preview
-            onClicked: root.focusEditor()
-        }
-        ActionButton {
-            text: "Preview"; highlighted: root.preview; flooded: root.preview && rendered.activeFocus; quiet: !root.preview; enabled: !!root.documentId
-            Accessible.name: "Preview Markdown"; Accessible.checkable: true; Accessible.checked: root.preview
-            onClicked: { root.preview = true; root.searchVisible = false; rendered.forceActiveFocus() }
-        }
-        Item { Layout.preferredWidth: 14 }
-        ActionButton { visible: !root.preview && !root.readOnly && root.width > 600; text: "B"; keys: "⌘B"; quiet: true; focusPolicy: Qt.TabFocus; Accessible.name: "Bold"; onClicked: root.wrap("**", "**", "bold text") }
-        ActionButton { visible: !root.preview && !root.readOnly && root.width > 600; text: "I"; keys: "⌘I"; quiet: true; focusPolicy: Qt.TabFocus; Accessible.name: "Italic"; onClicked: root.wrap("*", "*", "italic text") }
-        ActionButton { visible: !root.preview && !root.readOnly && root.width > 800; text: "Heading"; quiet: true; focusPolicy: Qt.TabFocus; onClicked: root.prefixLines("## ") }
-        ActionButton { visible: !root.preview && !root.readOnly && root.width > 800; text: "List"; quiet: true; focusPolicy: Qt.TabFocus; onClicked: root.prefixLines("- ") }
-        ActionButton { visible: !root.preview && !root.readOnly && root.width > 800; text: "Link"; keys: "⌘K"; quiet: true; focusPolicy: Qt.TabFocus; onClicked: root.insertLink() }
-        ActionButton {
-            id: more
-            visible: !root.preview && !root.readOnly
-            text: "Format ⌄"; quiet: true; focusPolicy: Qt.TabFocus
-            Accessible.name: "More Markdown formatting"
-            onClicked: formatMenu.popup(more, 0, height)
-            FieldMenu {
-                id: formatMenu
-                FieldMenuItem { text: "Bold"; onTriggered: root.wrap("**", "**", "bold text") }
-                FieldMenuItem { text: "Italic"; onTriggered: root.wrap("*", "*", "italic text") }
-                FieldMenuItem { text: "Heading"; onTriggered: root.prefixLines("## ") }
-                FieldMenuItem { text: "List"; onTriggered: root.prefixLines("- ") }
-                FieldMenuItem { text: "Link"; onTriggered: root.insertLink() }
-                FieldMenuItem { text: "Task list"; onTriggered: root.prefixLines("- [ ] ") }
-                FieldMenuItem { text: "Quote"; onTriggered: root.prefixLines("> ") }
-                FieldMenuItem { text: "Inline code"; onTriggered: root.wrap("`", "`", "code") }
-                FieldMenuItem { text: "Code block"; onTriggered: root.wrap("\n```\n", "\n```\n", "code") }
+    Rectangle {
+        Layout.fillWidth: true; Layout.preferredHeight: headerColumn.implicitHeight + 2 * root.headerPadding
+        color: root.headerColour
+        ColumnLayout {
+            id: headerColumn
+            anchors.left: parent.left; anchors.right: parent.right; anchors.top: parent.top; anchors.topMargin: root.headerPadding
+            spacing: 4
+            ColumnLayout { id: headerSlot; Layout.fillWidth: true; spacing: 0; visible: children.length > 0 }
+            RowLayout {
+                Layout.fillWidth: true; Layout.leftMargin: root.leftInset; Layout.rightMargin: root.rightInset; spacing: 2
+                ActionButton {
+                    text: "Write"; highlighted: !root.preview; flooded: !root.preview && source.activeFocus; quiet: root.preview; onCell: root.onCell; enabled: !!root.documentId
+                    Accessible.name: "Write Markdown"; Accessible.checkable: true; Accessible.checked: !root.preview
+                    onClicked: root.focusEditor()
+                }
+                ActionButton {
+                    text: "Preview"; highlighted: root.preview; flooded: root.preview && rendered.activeFocus; quiet: !root.preview; onCell: root.onCell; enabled: !!root.documentId
+                    Accessible.name: "Preview Markdown"; Accessible.checkable: true; Accessible.checked: root.preview
+                    onClicked: { root.preview = true; root.searchVisible = false; rendered.forceActiveFocus() }
+                }
+                Item { Layout.preferredWidth: 14 }
+                ActionButton { visible: !root.preview && !root.readOnly && root.width > 600; text: "B"; keys: "⌘B"; quiet: true; onCell: root.onCell; focusPolicy: Qt.TabFocus; Accessible.name: "Bold"; onClicked: root.wrap("**", "**", "bold text") }
+                ActionButton { visible: !root.preview && !root.readOnly && root.width > 600; text: "I"; keys: "⌘I"; quiet: true; onCell: root.onCell; focusPolicy: Qt.TabFocus; Accessible.name: "Italic"; onClicked: root.wrap("*", "*", "italic text") }
+                ActionButton { visible: !root.preview && !root.readOnly && root.width > 800; text: "Heading"; quiet: true; onCell: root.onCell; focusPolicy: Qt.TabFocus; onClicked: root.prefixLines("## ") }
+                ActionButton { visible: !root.preview && !root.readOnly && root.width > 800; text: "List"; quiet: true; onCell: root.onCell; focusPolicy: Qt.TabFocus; onClicked: root.prefixLines("- ") }
+                ActionButton { visible: !root.preview && !root.readOnly && root.width > 800; text: "Link"; keys: "⌘K"; quiet: true; onCell: root.onCell; focusPolicy: Qt.TabFocus; onClicked: root.insertLink() }
+                ActionButton {
+                    id: more
+                    visible: !root.preview && !root.readOnly
+                    text: "Format ⌄"; quiet: true; onCell: root.onCell; focusPolicy: Qt.TabFocus
+                    Accessible.name: "More Markdown formatting"
+                    onClicked: formatMenu.popup(more, 0, height)
+                    FieldMenu {
+                        id: formatMenu
+                        FieldMenuItem { text: "Bold"; onTriggered: root.wrap("**", "**", "bold text") }
+                        FieldMenuItem { text: "Italic"; onTriggered: root.wrap("*", "*", "italic text") }
+                        FieldMenuItem { text: "Heading"; onTriggered: root.prefixLines("## ") }
+                        FieldMenuItem { text: "List"; onTriggered: root.prefixLines("- ") }
+                        FieldMenuItem { text: "Link"; onTriggered: root.insertLink() }
+                        FieldMenuItem { text: "Task list"; onTriggered: root.prefixLines("- [ ] ") }
+                        FieldMenuItem { text: "Quote"; onTriggered: root.prefixLines("> ") }
+                        FieldMenuItem { text: "Inline code"; onTriggered: root.wrap("`", "`", "code") }
+                        FieldMenuItem { text: "Code block"; onTriggered: root.wrap("\n```\n", "\n```\n", "code") }
+                    }
+                }
+                Item { Layout.fillWidth: true }
+                ActionButton { text: "Find"; keys: "⌘F"; quiet: true; onCell: root.onCell; enabled: !!root.text; onClicked: root.focusSearch() }
+            }
+            RowLayout {
+                Layout.fillWidth: true; Layout.leftMargin: root.leftInset; Layout.rightMargin: root.rightInset; Layout.topMargin: 2
+                visible: root.searchVisible; spacing: 2
+                FieldText {
+                    id: searchField
+                    Layout.fillWidth: true; onCell: root.onCell
+                    placeholderText: "find in note"; Accessible.name: "Find in note"
+                    onTextEdited: { root.findPosition = -1; root.find(false) }
+                    onAccepted: root.find(false)
+                    Keys.onEscapePressed: { root.searchVisible = false; source.forceActiveFocus() }
+                }
+                Text {
+                    Layout.leftMargin: 10; Layout.rightMargin: 6
+                    text: !searchField.text ? "" : root.findPosition < 0 ? "none" : "found"
+                    font.family: T.mono; font.pixelSize: T.value; color: root.findPosition < 0 ? T.p.muted : T.p.ink
+                }
+                ActionButton { text: "↑"; implicitWidth: 28; quiet: true; onCell: root.onCell; Accessible.name: "Previous match"; enabled: !!searchField.text; onClicked: root.find(true) }
+                ActionButton { text: "↓"; implicitWidth: 28; quiet: true; onCell: root.onCell; Accessible.name: "Next match"; enabled: !!searchField.text; onClicked: root.find(false) }
+                ActionButton { text: "Close"; keys: "esc"; quiet: true; onCell: root.onCell; onClicked: { root.searchVisible = false; source.forceActiveFocus() } }
             }
         }
-        Item { Layout.fillWidth: true }
-        ActionButton { text: root.focusedWriting ? "Recorder" : "Focus"; highlighted: root.focusedWriting; quiet: !root.focusedWriting; visible: root.allowFocusMode; onClicked: root.focusModeRequested() }
-        ActionButton { text: "Find"; keys: "⌘F"; quiet: true; enabled: !!root.text; onClicked: root.focusSearch() }
-    }
-    RowLayout {
-        Layout.fillWidth: true; Layout.leftMargin: root.leftInset; Layout.rightMargin: root.rightInset; Layout.topMargin: 6
-        visible: root.searchVisible; spacing: 2
-        FieldText {
-            id: searchField
-            Layout.fillWidth: true
-            placeholderText: "find in note"; Accessible.name: "Find in note"
-            onTextEdited: { root.findPosition = -1; root.find(false) }
-            onAccepted: root.find(false)
-            Keys.onEscapePressed: { root.searchVisible = false; source.forceActiveFocus() }
-        }
-        Text {
-            Layout.leftMargin: 10; Layout.rightMargin: 6
-            text: !searchField.text ? "" : root.findPosition < 0 ? "none" : "found"
-            font.family: T.mono; font.pixelSize: T.value; color: root.findPosition < 0 ? T.p.muted : T.p.ink
-        }
-        ActionButton { text: "↑"; implicitWidth: 28; quiet: true; Accessible.name: "Previous match"; enabled: !!searchField.text; onClicked: root.find(true) }
-        ActionButton { text: "↓"; implicitWidth: 28; quiet: true; Accessible.name: "Next match"; enabled: !!searchField.text; onClicked: root.find(false) }
-        ActionButton { text: "Close"; keys: "esc"; quiet: true; onClicked: { root.searchVisible = false; source.forceActiveFocus() } }
     }
     Item {
-        Layout.fillWidth: true; Layout.fillHeight: true; Layout.minimumHeight: 36; Layout.topMargin: 6
+        Layout.fillWidth: true; Layout.fillHeight: true; Layout.minimumHeight: 36
         Flickable {
             id: sourceView
             objectName: "noteScroll"
@@ -191,7 +205,7 @@ ColumnLayout {
                 textFormat: TextEdit.PlainText; wrapMode: TextEdit.Wrap; selectByMouse: true; persistentSelection: true
                 readOnly: root.readOnly; font.family: T.sans; font.pixelSize: 15; color: T.p.ink
                 selectionColor: T.alpha(T.p.accent, .38); selectedTextColor: T.p.ink; placeholderTextColor: T.p.muted
-                leftPadding: root.leftInset; rightPadding: root.rightInset; topPadding: 10; bottomPadding: 24
+                leftPadding: root.leftInset; rightPadding: root.rightInset; topPadding: 18; bottomPadding: 24
                 placeholderText: T.lower(root.placeholderText); Accessible.name: root.accessibleName
                 onTextChanged: if (!root.syncing && !root.readOnly) root.edited(text)
                 onCursorRectangleChanged: root.revealCursor()
@@ -215,7 +229,7 @@ ColumnLayout {
                 textFormat: TextEdit.MarkdownText; readOnly: true; selectByMouse: true; wrapMode: TextEdit.Wrap
                 font.family: T.sans; font.pixelSize: 15; color: T.p.ink
                 selectionColor: T.alpha(T.p.accent, .38); selectedTextColor: T.p.ink
-                leftPadding: root.leftInset; rightPadding: root.rightInset; topPadding: 10; bottomPadding: 24
+                leftPadding: root.leftInset; rightPadding: root.rightInset; topPadding: 18; bottomPadding: 24
                 placeholderText: "nothing to preview"; placeholderTextColor: T.p.muted
                 Accessible.name: "Markdown preview"
                 onLinkActivated: link => { if (/^https?:\/\//i.test(link) || /^mailto:/i.test(link)) Qt.openUrlExternally(link) }

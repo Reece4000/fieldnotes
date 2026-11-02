@@ -9,6 +9,10 @@ Button {
     property bool primary: false
     property bool quiet: false
     property bool onBand: false
+    // On a cell-tone bar (a header or footer) the key steps back to the panel tone, so its
+    // hover still shows.
+    property bool onCell: false
+    readonly property color rest: control.onBand ? T.p.bandKey : control.onCell ? T.p.panel : T.p.cell
     property string keys: ""
     // Labels are lowercase; user content (names, titles) keeps its case.
     property bool lowercase: true
@@ -19,8 +23,8 @@ Button {
     readonly property color fill: !control.enabled ? (control.quiet ? "transparent" : control.onBand ? T.alpha(T.p.bandKey, .5) : T.p.panel)
         : control.focusFlood ? T.p.accent
         : control.down || control.highlighted ? (control.onBand ? T.p.bandInk : T.p.ink)
-        : control.hovered ? (control.onBand ? T.p.bandKey : T.p.cell)
-        : control.quiet ? "transparent" : control.onBand ? T.p.bandKey : T.p.cell
+        : control.hovered ? control.rest
+        : control.quiet ? "transparent" : control.rest
     readonly property color labelColour: !control.enabled ? (control.onBand ? T.p.bandMuted : T.p.dim)
         : control.focusFlood ? T.p.floodInk
         : control.down || control.highlighted ? (control.onBand ? T.p.band : T.p.floodInk)

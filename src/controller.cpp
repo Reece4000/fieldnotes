@@ -138,7 +138,7 @@ void Controller::handle(const QJsonObject &event) {
         m_engineError = event.value("engineError").toString();
         if (m_deletionPending == documentId && document.value("deleted").toBool()) {
             m_deletionPending.clear();
-            emit deleted();
+            emit deleted(m_deletedIds.size());
             if (!m_notes.isEmpty()) selectNote(m_notes[qMin(m_deletionIndex, int(m_notes.size()) - 1)].toMap().value("id").toString());
             else {
                 m_selected.clear(); m_document.clear(); emit documentChanged();
@@ -190,9 +190,11 @@ void Controller::handle(const QJsonObject &event) {
         emit stateChanged();
         emit notesMoved(event.value("count").toInt(), event.value("collection").toString());
     } else if (type == "deleted") {
-        m_deleted = event.value("id").toString();
+        m_deletedIds.clear();
+        for (const auto &id : event.value("ids").toArray()) m_deletedIds.append(id.toString());
+        if (m_deletedIds.isEmpty()) m_deletedIds.append(event.value("id").toString());
         // The selected-note state below also chooses a replacement document.
-        if (m_deleted != m_selected) emit deleted();
+        if (!m_deletedIds.contains(m_selected)) emit deleted(m_deletedIds.size());
     } else if (type == "devices") {
         m_devices = event.value("devices").toArray().toVariantList();
         emit devicesChanged();
@@ -266,10 +268,12 @@ void Controller::newNote(const QString &collection, const QString &workspace) {
     flushEdits();
     send({{"action", "new"}, {"collection", collection}, {"workspace", workspace}});
 }
-void Controller::query(const QString &workspace, const QString &collection, const QString &search, bool trash, bool all) {
+void Controller::query(const QString &workspace, const QString &collection, const QString &search, bool trash, bool all, const QString &select) {
     clearNoteSelection();
+    flushEdits();
     QJsonObject command{{"action", "query"}, {"workspace", workspace}, {"search", search}, {"trash", trash}, {"all", all}};
     if (collection != "*") command.insert("collection", collection);
+    if (!select.isEmpty()) command.insert("select", select);
     send(command);
 }
 void Controller::loadMore() { send({{"action", "more"}}); }
@@ -359,19 +363,27 @@ void Controller::exportNote(const QUrl &url) {
     emit exported();
 }
 void Controller::deleteNote() { trashNote(m_selected); }
-void Controller::trashNote(const QString &id) {
-    if (id.isEmpty()) return;
+void Controller::trashNote(const QString &id) { trashNotes({id}); }
+void Controller::trashNotes(const QStringList &ids) {
+    if (ids.isEmpty() || ids.contains(QString())) return;
     flushEdits();
-    if (id == m_selected) {
-        m_deletionPending = id;
+    if (ids.contains(m_selected)) {
+        m_deletionPending = m_selected;
         m_deletionIndex = 0;
         for (int i = 0; i < m_notes.size(); ++i) {
-            if (m_notes[i].toMap().value("id").toString() == id) { m_deletionIndex = i; break; }
+            if (m_notes[i].toMap().value("id").toString() == m_selected) { m_deletionIndex = i; break; }
         }
     }
-    send({{"action", "delete"}, {"id", id}});
+    send({{"action", "delete"}, {"id", ids.first()}, {"ids", QJsonArray::fromStringList(ids)}});
 }
-void Controller::undoDelete() { if (!m_deleted.isEmpty()) send({{"action", "restore"}, {"id", m_deleted}}); }
+void Controller::discardIfEmpty(const QString &id) {
+    if (id.isEmpty()) return;
+    flushEdits();
+    send({{"action", "discard"}, {"id", id}});
+}
+void Controller::undoDelete() {
+    if (!m_deletedIds.isEmpty()) send({{"action", "restore"}, {"id", m_deletedIds.first()}, {"ids", QJsonArray::fromStringList(m_deletedIds)}});
+}
 void Controller::restoreNote(const QString &id) {
     if (!id.isEmpty() || trashed()) send({{"action", "restore"}, {"id", id.isEmpty() ? m_selected : id}});
 }

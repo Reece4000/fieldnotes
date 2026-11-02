@@ -4,7 +4,7 @@ Fieldnotes is a QtQuick desktop app for recording spoken notes and transcribing 
 
 The project focuses on reliable long-form capture, editable transcripts and organised notes. Microphone capture runs independently of the interface and transcription engine, with audio saved to a recovery journal as it arrives.
 
-![Fieldnotes in the fieldnotes theme: the notes rail, a transcript in the Markdown editor, and the recorder band](assets/screenshot.png)
+![Fieldnotes in the instrument light theme: the header band in the title bar, the notes rail, a transcript in the Markdown editor, and the recorder band](assets/screenshot.png)
 
 ## Features
 
@@ -13,7 +13,7 @@ The project focuses on reliable long-form capture, editable transcripts and orga
 - Incremental transcripts, a live waveform and microphone level display.
 - Workspaces, categories and searchable notes with automatic first-sentence titles.
 - A dedicated Organise view with previews, drag-and-drop filing, bulk moves and an editor drawer.
-- A custom Markdown notes editor with formatting tools, a preview toggle, focused writing and automatic saving.
+- A custom Markdown notes editor with formatting tools, a preview toggle and automatic saving.
 - Clipboard copying, Markdown/text export, context menus and recoverable Trash.
 - Ten themes, light and dark: nine shared with TapeTop, and fieldnotes, a softer sage-green theme. See [DESIGN.md](DESIGN.md) for the design system.
 - Recovery of saved audio after interruption, with retry for failed transcription.
@@ -71,7 +71,7 @@ The window has three sections: **notes**, **organise** and **trash** (⌘1, ⌘2
 
 Open **organise** for a full collection view, including notes beyond the sidebar's first page. The workspace picker is labelled explicitly; categories stay in a separate sidebar while the notes scroll. Click a category to filter, or drag a note or selected group onto it to move them. Click a note to open its editor. Use **Select**, ⌘-click or Shift-click for multi-selection, then **Move…** or drag to a category. Search full transcripts and use **View** for sorting and filters. Category menus offer rename, reorder and remove; removing a category makes its notes Unfiled, including notes in Trash, without deleting them. Recording can continue while organising.
 
-Click **new note** (⌘N) to type a note in the focused writing view. The **Write** tab keeps the original Markdown source; **Preview** renders headings, emphasis, lists, task lists, links, tables and code blocks without modifying the saved text. The formatting toolbar includes bold, italic, headings, lists and links, with every option also available under **Format** in compact windows. Formatting supports undo/redo; the editor also includes Find and a word count. The same editor is available in the Organise drawer. **Focus** hides the recorder and **Recorder** returns it, and an active recording keeps Pause and Stop available while writing.
+Click **new note** (⌘N) to type a note. A new note left empty (no text, audio or title of its own) is discarded when you move to another note or close it. The **Write** tab keeps the original Markdown source; **Preview** renders headings, emphasis, lists, task lists, links, tables and code blocks without modifying the saved text. The formatting toolbar includes bold, italic, headings, lists and links, with every option also available under **Format** in compact windows. Formatting supports undo/redo; the editor also includes Find and a word count. The same editor is available in the Organise drawer. The recorder stays in view the whole time.
 
 Completed transcripts are editable. Text and title changes save after a 750 ms typing pause; switching notes or closing the app flushes pending edits. A transcript stays read-only while its recording or transcription is active.
 

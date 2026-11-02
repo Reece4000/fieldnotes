@@ -19,7 +19,7 @@ colors:
   record: "#e5483d"
   readout: "#e8fa42"
 typography:
-  section: { fontFamily: Geist, fontSize: "26px" }
+  section: { fontFamily: Geist, fontSize: "14px" }
   label: { fontFamily: Geist, fontSize: "13–14px" }
   value: { fontFamily: Geist Mono, fontSize: "11–12px" }
   menu: { fontFamily: Geist Mono, fontSize: "12px" }
@@ -58,7 +58,7 @@ Everything else is greyscale. The current choice inverts: an ink cell with groun
 
 ## Type
 
-- **Geist:** labels and note text. Section titles (notes, organise, trash) are 26px; the current one is ink, the others dim.
+- **Geist:** labels and note text. Section tabs (notes, organise, trash) are 14px in the title bar; the current one is ink, the others muted.
 - **Geist Mono:** values, counts, dates, key legends and menus.
 - **DSEG14 Modern:** the clock, with the unlit segments faintly behind.
 
@@ -70,18 +70,18 @@ Alignment is the design: every edge sits on a grid line, and the line between ta
 
 ### Bars and panels
 
-- **Header:** a band. It has the band's colour and ink, as in Lodo and TapeTop, and runs up through the native title bar. It holds the section titles on the left, and the workspace and engine status on the right. The titles span the rail's content exactly: the ink of notes starts on the left content line, the ink of trash ends on the rail's right content edge (278), and the gaps between them are equal.
+- **Header:** a band. It has the band's colour and ink, as in Lodo and TapeTop, and it is the title bar: one row, 38 tall, with the traffic lights centred in it. As in TapeTop it holds small things clear of the lights: the section tabs (14px, the current one in ink) from 96, and the workspace and engine status on the right. The band itself moves the window, and a double click zooms it.
 - **Body:** panel columns on the ground, 6-unit gutters around and between them:
   - the rail, 290 wide;
   - the document, or in organise the categories (also 290) and the note list.
 
-  Content sits 18 units inside each panel. Each panel ends in a cell-tone footer bar, 40 tall in every section (`T.footer`), so scrolled content ends on a tone step, and lists size to whole rows.
+  Content sits 18 units inside each panel. The document opens with a cell-tone block holding its title and toolbar, 18 inside on every side, and its text scrolls under it. Each panel ends in a cell-tone footer bar, 40 tall in every section (`T.footer`), so scrolled content ends on a tone step. A list fills its panel down to the footer or the panel's edge and scrolls off it; it never stops short above blank space.
 - **Band:** the recorder, across the foot.
 
 ### Grid lines
 
-- **Left content line (24):** the section titles, the rail's cells and labels, and the band's readout.
-- **Document line (320):** the title, editor tabs, text and footer, and the band's rec key. The readout spans the rail's content width and stops on its edge. It is as tall as the keys beside it, and its status word sits inside the window on the keys' label line.
+- **Left content line (24):** the rail's cells and labels, and the band's readout.
+- **Document line (320):** the note title, editor tabs, text and footer, and the band's rec key. The readout spans the rail's content width and stops on its edge. It is as tall as the keys beside it, and its status word sits inside the window on the keys' label line.
 - **Right edge (24 in from the window):** the header, document and band end together.
 - **Cells:** text inside a cell sits 10 in from the cell's edge; bare labels sit on the line itself.
 - **Rows:** the document toolbar shares a row with the rail's search field.

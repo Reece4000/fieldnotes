@@ -18,6 +18,17 @@ Item {
     property var contextIds: []
     property string contextId: ""
     readonly property var visibleNotes: notes.filter(n => category === "*" || n.collection === category)
+    // The list keeps its scroll when its notes refresh (a save, a transcription); it starts at
+    // the top only when you change what it shows. A bound model would reset it every time.
+    readonly property string listKey: workspace + "|" + category + "|" + filter + "|" + sort + "|" + search
+    property string shownKey: ""
+    function showNotes() {
+        const y = shownKey === listKey ? files.contentY - files.originY : 0
+        shownKey = listKey
+        files.model = visibleNotes
+        files.contentY = files.originY + Math.max(0, Math.min(y, files.contentHeight - files.height))
+    }
+    Component.onCompleted: showNotes()
     property string categoryTarget: ""
     property bool removingCategory: false
     property bool categoryBusy: false
@@ -86,6 +97,7 @@ Item {
     onCategoryChanged: { controller.clearNoteSelection(); selectionAnchor = "" }
     onFilterChanged: controller.clearNoteSelection()
     onVisibleNotesChanged: {
+        showNotes()
         if (!visible) return
         let visibleIds = visibleNotes.map(n => n.id)
         let selected = controller.selectedNoteIds.filter(id => visibleIds.indexOf(id) >= 0)
@@ -120,8 +132,9 @@ Item {
         anchors.fill: parent; anchors.margins: 6; spacing: 6
             Rectangle {
                 Layout.preferredWidth: 290; Layout.fillHeight: true; color: T.p.panel
+            // No bottom inset: the category list runs to the panel's edge and scrolls off it.
             ColumnLayout {
-                anchors.fill: parent; anchors.margins: 18; spacing: 8
+                anchors.fill: parent; anchors.margins: 18; anchors.bottomMargin: 0; spacing: 8
                 RowLayout {
                     Layout.fillWidth: true
                     Text { text: "categories"; font.family: T.sans; font.pixelSize: 13; color: T.p.muted }
@@ -217,8 +230,8 @@ Item {
                     id: files
                     PixelScroll { viewport: files }
                     objectName: "organisedNotes"
-                    width: parent.width; height: Math.max(56, Math.floor(parent.height / 56) * 56); clip: true
-                    model: root.visibleNotes; boundsBehavior: Flickable.StopAtBounds
+                    anchors.fill: parent; clip: true
+                    boundsBehavior: Flickable.StopAtBounds
                     ScrollBar.vertical: FieldScrollBar { }
                     delegate: ItemDelegate {
                         id: file
@@ -309,6 +322,12 @@ Item {
         id: fileMenu
         FieldMenuItem { text: "Open note"; onTriggered: root.edit(root.contextId) }
         FieldMenuItem { text: "Move to category…"; enabled: !root.controller.moving; onTriggered: root.moveRequested(root.contextIds) }
+        FieldMenuGap { }
+        FieldMenuItem {
+            text: root.contextIds.length > 1 ? "Move " + root.contextIds.length + " notes to Trash" : "Move note to Trash"
+            enabled: root.contextIds.length > 0 && root.contextIds.every(id => { const n = root.controller.noteRows.find(r => r.id === id); return !!n && n.status !== "recording" && n.status !== "paused" && (n.pending || 0) <= (n.errors || 0) })
+            onTriggered: { root.controller.trashNotes(root.contextIds); root.selecting = false; root.controller.clearNoteSelection() }
+        }
     }
     Rectangle {
         id: dragGhost
@@ -359,7 +378,7 @@ Item {
         edge: Qt.RightEdge; width: Math.min(520, root.width - 48); height: root.height
         modal: true; leftPadding: 18; rightPadding: 18; topPadding: 18; bottomPadding: 18
         onOpened: if (!root.controller.body && root.controller.editable) editBody.focusEditor()
-        onClosed: { root.editTarget = ""; root.creatingNote = false }
+        onClosed: { root.controller.discardIfEmpty(root.controller.selectedId); root.editTarget = ""; root.creatingNote = false }
         background: Rectangle { color: T.p.panel }
         Overlay.modal: Rectangle { color: T.alpha(T.p.ground, .6) }
         contentItem: ColumnLayout {

@@ -6,39 +6,31 @@ bool fieldnotesSystemReduceMotion() {
 
 #include <QWindow>
 
-// The expanded Qt client area paints behind the title bar but does not provide
-// AppKit's usual draggable title-bar view. Keep dragging native and independent
-// of QML hit testing; native traffic lights remain outside this view's bounds.
-@interface FieldnotesTitleDragView : NSView
-@end
-@implementation FieldnotesTitleDragView
-- (BOOL)acceptsFirstMouse:(NSEvent *)event { return YES; }
-- (NSView *)hitTest:(NSPoint)point {
-    if (self.window.styleMask & NSWindowStyleMaskFullScreen) return nil;
-    return [super hitTest:point];
+// The header band lives in the title bar. An empty compact toolbar makes the title bar
+// 38 tall and centres the traffic lights in it (x 12 to 66); its own view is hidden, because it
+// would take every click in the strip from the Qt view below. The band moves the
+// window itself (QML calls startSystemMove), so the strip stays one surface.
+static void fieldnotesHideToolbarView(NSWindow *window) {
+    NSView *titlebar = [window standardWindowButton:NSWindowCloseButton].superview;
+    for (NSView *view in titlebar.subviews)
+        if ([NSStringFromClass([view class]) isEqualToString:@"NSToolbarView"]) view.hidden = YES;
 }
-- (void)mouseDown:(NSEvent *)event {
-    if (event.clickCount == 2) {
-        [self.window performZoom:nil];
-    } else {
-        [self.window performWindowDragWithEvent:event];
-    }
-}
-@end
 
 void fieldnotesStyleWindow(QWindow *window) {
     NSView *view = (__bridge NSView *)(void *)window->winId();
     NSWindow *nativeWindow = view.window;
     nativeWindow.titleVisibility = NSWindowTitleHidden;
     nativeWindow.titlebarAppearsTransparent = YES;
-    const CGFloat controlsWidth = 80;
-    const CGFloat titleHeight = MAX(28, nativeWindow.frame.size.height - nativeWindow.contentLayoutRect.size.height);
-    FieldnotesTitleDragView *dragView = [[FieldnotesTitleDragView alloc]
-        initWithFrame:NSMakeRect(controlsWidth, view.isFlipped ? 0 : view.bounds.size.height - titleHeight,
-                                MAX(0, view.bounds.size.width - controlsWidth), titleHeight)];
-    dragView.autoresizingMask = NSViewWidthSizable | (view.isFlipped ? NSViewMaxYMargin : NSViewMinYMargin);
-    [view addSubview:dragView];
-    [dragView release];
+    NSToolbar *toolbar = [[NSToolbar alloc] initWithIdentifier:@"fieldnotes"];
+    nativeWindow.toolbar = toolbar;
+    [toolbar release];
+    nativeWindow.toolbarStyle = NSWindowToolbarStyleUnifiedCompact;
+    nativeWindow.titlebarSeparatorStyle = NSTitlebarSeparatorStyleNone;
+    fieldnotesHideToolbarView(nativeWindow);
+    // Full screen moves the title bar into its own window and back; hide the view again after.
+    for (NSNotificationName name : {NSWindowDidEnterFullScreenNotification, NSWindowDidExitFullScreenNotification})
+        [[NSNotificationCenter defaultCenter] addObserverForName:name object:nativeWindow queue:nil
+            usingBlock:^(NSNotification *note) { fieldnotesHideToolbarView(note.object); }];
     // The appearance follows the theme (QML sets the colour scheme); the window
     // background follows the appearance, so a resize never flashes the wrong tone.
     nativeWindow.backgroundColor = NSColor.windowBackgroundColor;

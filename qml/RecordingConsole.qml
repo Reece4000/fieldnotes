@@ -40,29 +40,26 @@ Rectangle {
         anchors.topMargin: recorderConsole.margin; anchors.bottomMargin: recorderConsole.margin
         spacing: recorderConsole.gap
 
-        ColumnLayout {
+        // The readout window is as tall as the keys beside it, and its status word sits on the
+        // keys' label line (Geist Mono sits 1 lower than Geist, hence 11), 10 in from the left.
+        Readout {
             Layout.preferredWidth: recorderConsole.leadWidth; Layout.fillHeight: true
             Layout.rightMargin: recorderConsole.leadGap - recorderConsole.gap
-            spacing: 0
-            Readout {
-                Layout.fillWidth: true
-                Layout.preferredHeight: recorderConsole.compact ? 50 : 66
-                size: recorderConsole.narrow || recorderConsole.compact ? 24 : 30
-                text: recorderConsole.controller.clock(recorderConsole.controller.recording ? recorderConsole.controller.seconds : 0)
-                lit: recorderConsole.controller.recording
-            }
-            Item { Layout.fillHeight: true }
-            RowLayout {
-                Layout.fillWidth: true; Layout.preferredHeight: 18; spacing: 8
+            size: recorderConsole.narrow || recorderConsole.compact ? 24 : 30
+            text: recorderConsole.controller.clock(recorderConsole.controller.recording ? recorderConsole.controller.seconds : 0)
+            lit: recorderConsole.controller.recording
+            offset: -8
+            Row {
+                x: 10; anchors.bottom: parent.bottom; anchors.bottomMargin: 11
+                spacing: 8
                 Rectangle {
-                    Layout.preferredWidth: 8; Layout.preferredHeight: 8
-                    color: recorderConsole.controller.recording ? T.p.record : recorderConsole.controller.connected ? T.p.bandInk : T.p.amber
+                    anchors.verticalCenter: parent.verticalCenter; width: 8; height: 8
+                    color: recorderConsole.controller.recording ? T.p.record : recorderConsole.controller.connected ? T.p.ink : T.p.amber
                     opacity: recorderConsole.controller.paused ? .45 : 1
                 }
                 Text {
-                    Layout.fillWidth: true; elide: Text.ElideRight
                     text: recorderConsole.controller.stopping ? "stopping" : recorderConsole.capturing ? recorderConsole.controller.paused ? "paused" : "recording" : recorderConsole.controller.connected ? "ready" : "connecting"
-                    font.family: T.mono; font.pixelSize: T.value; color: T.p.bandInk
+                    font.family: T.mono; font.pixelSize: T.value; color: T.p.ink
                 }
             }
         }

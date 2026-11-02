@@ -292,7 +292,7 @@ Item {
             }
             // The footer bar steps up to the cell tone, so the list ends on a tone change.
             Rectangle {
-                Layout.fillWidth: true; Layout.preferredHeight: 44; color: T.p.cell
+                Layout.fillWidth: true; Layout.preferredHeight: T.footer; color: T.p.cell
         RowLayout {
             anchors.fill: parent; anchors.leftMargin: 18; anchors.rightMargin: 18; spacing: 8
             Rectangle { visible: !!root.controller.error || !!root.notice; Layout.preferredWidth: 6; Layout.preferredHeight: 6; color: root.controller.error ? T.p.magenta : T.p.ink }

@@ -14,6 +14,8 @@ var section = 26
 var label = 14
 var value = 12
 var small = 11
+// Every panel ends in a footer bar of this height, so the bars line up across sections.
+var footer = 40
 
 function alpha(color, a) { var c = Qt.color(color); return Qt.rgba(c.r, c.g, c.b, a) }
 function lower(s) { return s ? String(s).toLowerCase() : "" }

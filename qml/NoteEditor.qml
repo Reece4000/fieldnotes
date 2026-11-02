@@ -225,7 +225,7 @@ ColumnLayout {
         }
     }
     Rectangle {
-        Layout.fillWidth: true; Layout.preferredHeight: 34
+        Layout.fillWidth: true; Layout.preferredHeight: T.footer
         color: root.footerColour
         RowLayout {
             anchors.fill: parent; anchors.leftMargin: root.leftInset; anchors.rightMargin: root.rightInset; spacing: 6

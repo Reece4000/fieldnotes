@@ -1,7 +1,8 @@
 import QtQuick
 
 // The current theme's colours, one shared instance (see Theme.js). The themes are
-// TapeTop's device themes, so the instruments share one vocabulary. Each colour keeps
+// TapeTop's device themes, so the instruments share one vocabulary, plus fieldnotes: the
+// app's original sage greens at a softer contrast. Each colour keeps
 // one meaning: accent is the cursor, track4 (amber) work still to do, track2 (magenta)
 // a failure, record recording only, readout the clock only.
 QtObject {
@@ -12,6 +13,7 @@ QtObject {
         { id: "paper", name: "paper", appearance: "light", ground: "#f3efe6", panel: "#e3ded1", cell: "#d5cfbf", ink: "#1c1a16", muted: "#5f5a4f", dim: "#9a9485", band: "#23211d", bandInk: "#f3efe6", bandKey: "#37342e", bandMuted: "#8f897c", accent: "#2457d6", onAccent: "#ffffff", record: "#c8372c", readout: "#1c1a16", track2: "#c23b6e", track4: "#b5651d" },
         { id: "studio", name: "studio", appearance: "light", ground: "#f7f8fa", panel: "#e5e8ed", cell: "#d6dae1", ink: "#0d0f14", muted: "#535a67", dim: "#959bab", band: "#0d0f14", bandInk: "#f7f8fa", bandKey: "#272b34", bandMuted: "#858b98", accent: "#b2237e", onAccent: "#ffffff", record: "#cf332b", readout: "#0d0f14", track2: "#1f6fd1", track4: "#c46a12" },
         { id: "sand", name: "sand", appearance: "light", ground: "#ece4d4", panel: "#dad0bc", cell: "#cbc0a9", ink: "#2a2117", muted: "#5c4f3f", dim: "#a3967f", band: "#3a3024", bandInk: "#f1e9da", bandKey: "#4c4031", bandMuted: "#a89a82", accent: "#9e4813", onAccent: "#ffffff", record: "#b3261e", readout: "#2a2117", track2: "#2f6b78", track4: "#7a5a9a" },
+        { id: "fieldnotes", name: "fieldnotes", appearance: "light", ground: "#f3f7f0", panel: "#e8eee3", cell: "#dde6d6", ink: "#293d2b", muted: "#65765c", dim: "#97a592", band: "#55695a", bandInk: "#eef3ea", bandKey: "#627766", bandMuted: "#a9b8a7", accent: "#4c755b", onAccent: "#f8fbf5", record: "#b44530", readout: "#293d2b", track2: "#a8466e", track4: "#b39140" },
         { id: "instrument", name: "instrument", appearance: "dark", ground: "#0c0d10", panel: "#16181c", cell: "#1f2227", ink: "#eceef2", muted: "#7d838f", dim: "#4a4f58", band: "#c6c8ce", bandInk: "#111216", bandKey: "#aeb1b8", bandMuted: "#4d5159", accent: "#34c6cc", onAccent: "#0c0d10", record: "#e5483d", readout: "#e8fa42", track2: "#f2477f", track4: "#f0a33a" },
         { id: "graphite", name: "graphite", appearance: "dark", ground: "#121110", panel: "#1d1b19", cell: "#272521", ink: "#ede9e1", muted: "#8c867b", dim: "#524d45", band: "#dad4c8", bandInk: "#141311", bandKey: "#c3bdb0", bandMuted: "#5c574e", accent: "#e9a43b", onAccent: "#141311", record: "#e4523f", readout: "#f2b54a", track2: "#e0675a", track4: "#6fb8a6" },
         { id: "night", name: "night", appearance: "dark", ground: "#0b0d14", panel: "#151926", cell: "#1e2334", ink: "#e6e9f5", muted: "#7c84a2", dim: "#464d68", band: "#cad0e8", bandInk: "#0f1220", bandKey: "#b1b8d6", bandMuted: "#4d5472", accent: "#8291ff", onAccent: "#0b0d14", record: "#ff5d6c", readout: "#a9b6ff", track2: "#e66fc4", track4: "#e8b65a" },

@@ -4,6 +4,8 @@ Fieldnotes is a QtQuick desktop app for recording spoken notes and transcribing 
 
 The project focuses on reliable long-form capture, editable transcripts and organised notes. Microphone capture runs independently of the interface and transcription engine, with audio saved to a recovery journal as it arrives.
 
+![Fieldnotes in the fieldnotes theme: the notes rail, a transcript in the Markdown editor, and the recorder band](assets/screenshot.png)
+
 ## Features
 
 - Local English transcription with Phonon-2 on Apple silicon Macs running macOS Sequoia 15 or later.
@@ -13,7 +15,7 @@ The project focuses on reliable long-form capture, editable transcripts and orga
 - A dedicated Organise view with previews, drag-and-drop filing, bulk moves and an editor drawer.
 - A custom Markdown notes editor with formatting tools, a preview toggle, focused writing and automatic saving.
 - Clipboard copying, Markdown/text export, context menus and recoverable Trash.
-- Nine themes, light and dark, shared with TapeTop. See [DESIGN.md](DESIGN.md) for the design system.
+- Ten themes, light and dark: nine shared with TapeTop, and fieldnotes, a softer sage-green theme. See [DESIGN.md](DESIGN.md) for the design system.
 - Recovery of saved audio after interruption, with retry for failed transcription.
 - Automatic removal of temporary audio after its transcript is committed.
 - Read-only access to saved notes for scripts and LLM tools.

@@ -1,6 +1,6 @@
 ---
 name: Fieldnotes
-description: A voice notebook as a flat, type-led instrument. A field for the notes, a band of the opposite tone for the recorder, in nine themes.
+description: A voice notebook as a flat, type-led instrument. A field for the notes, a band of the opposite tone for the recorder, in ten themes.
 colors:
   ground: "#0c0d10"
   panel: "#16181c"
@@ -41,7 +41,7 @@ Fieldnotes is a voice notebook in the house instrument style of Macro OSC, Lodo 
 
 Colour is data, and each colour has one meaning. The front matter shows the instrument theme. All themes live in `qml/ThemePalette.qml`, reached as `T.p.<token>` through `qml/Theme.js`. They are TapeTop's device themes, so the instruments share one vocabulary:
 
-- **Light:** instrument light (the default), paper, studio and sand.
+- **Light:** instrument light (the default), paper, studio, sand and fieldnotes. Fieldnotes is the app's original sage greens at a softer contrast: a mid-green band rather than a near-black one, and a deep green ink.
 - **Dark:** instrument, graphite, night, carbon and lodo.
 
 In each theme, the theme's track 4 is the amber role and track 2 the magenta role.
@@ -70,18 +70,18 @@ Alignment is the design: every edge sits on a grid line, and the line between ta
 
 ### Bars and panels
 
-- **Header:** a band. It has the band's colour and ink, as in Lodo and TapeTop, and runs up through the native title bar. It holds the section titles on the left, and the workspace and engine status on the right.
+- **Header:** a band. It has the band's colour and ink, as in Lodo and TapeTop, and runs up through the native title bar. It holds the section titles on the left, and the workspace and engine status on the right. The titles span the rail's content exactly: the ink of notes starts on the left content line, the ink of trash ends on the rail's right content edge (278), and the gaps between them are equal.
 - **Body:** panel columns on the ground, 6-unit gutters around and between them:
   - the rail, 290 wide;
   - the document, or in organise the categories (also 290) and the note list.
 
-  Content sits 18 units inside each panel. Each panel ends in a cell-tone footer bar, so scrolled content ends on a tone step, and lists size to whole rows.
+  Content sits 18 units inside each panel. Each panel ends in a cell-tone footer bar, 40 tall in every section (`T.footer`), so scrolled content ends on a tone step, and lists size to whole rows.
 - **Band:** the recorder, across the foot.
 
 ### Grid lines
 
 - **Left content line (24):** the section titles, the rail's cells and labels, and the band's readout.
-- **Document line (320):** the title, editor tabs, text and footer, and the band's rec key. The readout column spans the rail's content width and stops on its edge.
+- **Document line (320):** the title, editor tabs, text and footer, and the band's rec key. The readout spans the rail's content width and stops on its edge. It is as tall as the keys beside it, and its status word sits inside the window on the keys' label line.
 - **Right edge (24 in from the window):** the header, document and band end together.
 - **Cells:** text inside a cell sits 10 in from the cell's edge; bare labels sit on the line itself.
 - **Rows:** the document toolbar shares a row with the rail's search field.

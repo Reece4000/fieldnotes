@@ -346,27 +346,42 @@ ApplicationWindow {
                 id: header
                 anchors.fill: parent; anchors.leftMargin: 24; anchors.rightMargin: 24
                 spacing: 22
-                Repeater {
-                    model: ["notes", "organise", "trash"]
-                    Text {
-                        id: sectionTitle
-                        required property string modelData
-                        required property int index
-                        readonly property bool current: window.section === modelData
-                        readonly property bool dropping: modelData === "trash" && trashDrop.containsDrag
-                        text: modelData
-                        font.family: T.sans; font.pixelSize: T.section
-                        color: dropping ? T.p.floodInk : current ? T.p.bandInk : sectionHover.hovered ? T.alpha(T.p.bandInk, .75) : T.p.bandMuted
-                        Accessible.role: Accessible.PageTab; Accessible.name: modelData; Accessible.selected: current
-                        Rectangle { visible: sectionTitle.dropping; z: -1; anchors.fill: parent; anchors.margins: -4; color: T.p.accent }
-                        HoverHandler { id: sectionHover; cursorShape: Qt.PointingHandCursor }
-                        TapHandler { onTapped: window.chooseSection(sectionTitle.modelData) }
-                        DropArea {
-                            id: trashDrop
-                            anchors.fill: parent; anchors.margins: -8; enabled: sectionTitle.modelData === "trash"; keys: ["fieldnotes-note"]
-                            onEntered: drag => { drag.accepted = drag.source === noteDragGhost && !!noteDragGhost.noteId }
-                            onDropped: drop => {
-                                if (drop.source === noteDragGhost && noteDragGhost.noteId) { window.c.trashNote(noteDragGhost.noteId); drop.accept(Qt.MoveAction) }
+                // The titles span the rail's content exactly: the ink of notes starts on its left
+                // line, the ink of trash ends on its right edge, and the gaps between them are
+                // equal. At 26px Geist the n sits 2 in from its box and the h ends 3 short of it.
+                RowLayout {
+                    Layout.preferredWidth: 290 - 36 + 2 + 3; Layout.leftMargin: -2; Layout.fillWidth: false
+                    spacing: 0
+                    Repeater {
+                        model: ["notes", "", "organise", "", "trash"]
+                        delegate: Item {
+                            id: titleSlot
+                            required property string modelData
+                            // The blank slots are the equal gaps between the titles.
+                            Layout.fillWidth: !modelData
+                            implicitWidth: modelData ? sectionTitle.implicitWidth : 0
+                            implicitHeight: sectionTitle.implicitHeight
+                            Text {
+                                id: sectionTitle
+                                visible: !!titleSlot.modelData
+                                readonly property string name: titleSlot.modelData
+                                readonly property bool current: window.section === name
+                                readonly property bool dropping: name === "trash" && trashDrop.containsDrag
+                                text: name
+                                font.family: T.sans; font.pixelSize: T.section
+                                color: dropping ? T.p.floodInk : current ? T.p.bandInk : sectionHover.hovered ? T.alpha(T.p.bandInk, .75) : T.p.bandMuted
+                                Accessible.role: Accessible.PageTab; Accessible.name: name; Accessible.selected: current
+                                Rectangle { visible: sectionTitle.dropping; z: -1; anchors.fill: parent; anchors.margins: -4; color: T.p.accent }
+                                HoverHandler { id: sectionHover; cursorShape: Qt.PointingHandCursor }
+                                TapHandler { onTapped: window.chooseSection(sectionTitle.name) }
+                                DropArea {
+                                    id: trashDrop
+                                    anchors.fill: parent; anchors.margins: -8; enabled: sectionTitle.name === "trash"; keys: ["fieldnotes-note"]
+                                    onEntered: drag => { drag.accepted = drag.source === noteDragGhost && !!noteDragGhost.noteId }
+                                    onDropped: drop => {
+                                        if (drop.source === noteDragGhost && noteDragGhost.noteId) { window.c.trashNote(noteDragGhost.noteId); drop.accept(Qt.MoveAction) }
+                                    }
+                                }
                             }
                         }
                     }

@@ -15,6 +15,9 @@ def timestamp(seconds):
 
 def first_sentence(body):
     text = re.sub(r"\[\d+:\d+:\d+\]\s*", "", body).strip()
+    heading = re.match(r"#{1,6}[ \t]+([^\n]+)", text)
+    if heading:
+        return re.sub(r"[ \t]+#+[ \t]*$", "", heading[1]).strip()
     text = re.sub(r"\s+", " ", text)
     match = re.search(r"[.!?](?=\s|$)", text)
     return text[:match.end()] if match else text
@@ -58,6 +61,10 @@ class Store:
             workspace TEXT NOT NULL REFERENCES workspaces(id), name TEXT NOT NULL COLLATE NOCASE,
             PRIMARY KEY(workspace,name));
         """)
+        category_columns = {row[1] for row in self.db.execute("PRAGMA table_info(categories)")}
+        if "position" not in category_columns:
+            with self.db:
+                self.db.execute("ALTER TABLE categories ADD COLUMN position INTEGER NOT NULL DEFAULT 0")
         columns = {row[1] for row in self.db.execute("PRAGMA table_info(notes)")}
         with self.db:
             if "workspace" not in columns:
@@ -69,7 +76,7 @@ class Store:
                 self.db.execute("UPDATE notes SET auto_title=0 WHERE title NOT LIKE 'Recording · %' AND title NOT IN ('Untitled note','Untitled')")
                 for row in self.db.execute("SELECT id,body FROM notes WHERE auto_title=1 AND body!=''").fetchall():
                     self.db.execute("UPDATE notes SET title=? WHERE id=?", (first_sentence(row["body"]), row["id"]))
-            self.db.execute("INSERT OR IGNORE INTO categories SELECT DISTINCT workspace,collection FROM notes WHERE collection!=''")
+            self.db.execute("INSERT OR IGNORE INTO categories(workspace,name) SELECT DISTINCT workspace,collection FROM notes WHERE collection!=''")
             self.db.execute("CREATE INDEX IF NOT EXISTS notes_workspace ON notes(workspace,deleted,created DESC)")
             from notes_reader import VIEW_SQL
             self.db.execute("CREATE VIEW IF NOT EXISTS notes_readonly AS " + VIEW_SQL)
@@ -80,7 +87,7 @@ class Store:
         with self.lock, self.db:
             self._check_workspace(workspace)
             if collection:
-                self.db.execute("INSERT OR IGNORE INTO categories VALUES(?,?)", (workspace, collection))
+                self.db.execute("INSERT OR IGNORE INTO categories(workspace,name) VALUES(?,?)", (workspace, collection))
             self.db.execute("INSERT INTO notes(id,title,collection,created,updated,workspace,voice_db,auto_title) VALUES(?,?,?,?,?,?,?,?)",
                             (note_id, title or "New recording", collection, now, now, workspace, voice_db,
                              int(title in (None, "Untitled note", "Untitled"))))
@@ -109,13 +116,34 @@ class Store:
             self._check_workspace(workspace)
             collection = fields.get("collection", note["collection"])
             if collection:
-                self.db.execute("INSERT OR IGNORE INTO categories VALUES(?,?)", (workspace, collection))
+                self.db.execute("INSERT OR IGNORE INTO categories(workspace,name) VALUES(?,?)", (workspace, collection))
             if "title" in fields:
                 fields["auto_title"] = 0
             elif "body" in fields and note["auto_title"]:
                 fields["title"] = first_sentence(fields["body"]) or "Untitled note"
             self.db.execute("UPDATE notes SET " + ",".join(f"{key}=?" for key in fields) + " WHERE id=?",
                             (*fields.values(), note_id))
+
+    def move_notes(self, note_ids, workspace, collection):
+        """Move a selection atomically without touching transcripts or capture state."""
+        if not isinstance(note_ids, list) or not note_ids or any(not isinstance(n, str) or not n for n in note_ids):
+            raise ValueError("Select at least one note to move")
+        note_ids = list(dict.fromkeys(note_ids))
+        with self.lock, self.db:
+            self._check_workspace(workspace)
+            if collection:
+                category = self.db.execute("SELECT name FROM categories WHERE workspace=? AND name=?",
+                                           (workspace, collection)).fetchone()
+                if not category:
+                    raise ValueError("Choose an existing category")
+                collection = category["name"]
+            for note_id in note_ids:
+                note = self.note(note_id)
+                if not note or note["deleted"] or note["workspace"] != workspace:
+                    raise ValueError("A selected note is no longer in this workspace. Select the notes again.")
+            self.db.executemany("UPDATE notes SET collection=?,updated=? WHERE id=?",
+                                [(collection, time.time(), note_id) for note_id in note_ids])
+        return len(note_ids)
 
     def _check_workspace(self, workspace):
         if not self.db.execute("SELECT 1 FROM workspaces WHERE id=?", (workspace,)).fetchone():
@@ -139,14 +167,46 @@ class Store:
             raise ValueError("Give the category a name")
         with self.lock, self.db:
             self._check_workspace(workspace)
-            self.db.execute("INSERT OR IGNORE INTO categories VALUES(?,?)", (workspace, name))
+            self.db.execute("INSERT OR IGNORE INTO categories(workspace,name) VALUES(?,?)", (workspace, name))
+
+    def rename_category(self, workspace, name, replacement):
+        replacement = replacement.strip()
+        if not replacement:
+            raise ValueError("Give the category a name")
+        with self.lock, self.db:
+            category = self.db.execute("SELECT name FROM categories WHERE workspace=? AND name=?", (workspace, name)).fetchone()
+            if not category:
+                raise ValueError("This category no longer exists")
+            try:
+                self.db.execute("UPDATE categories SET name=? WHERE workspace=? AND name=?", (replacement, workspace, name))
+            except sqlite3.IntegrityError as exc:
+                raise ValueError("A category with this name already exists") from exc
+            self.db.execute("UPDATE notes SET collection=?,updated=? WHERE workspace=? AND collection=?",
+                            (replacement, time.time(), workspace, category["name"]))
+
+    def remove_category(self, workspace, name):
+        with self.lock, self.db:
+            category = self.db.execute("SELECT name FROM categories WHERE workspace=? AND name=?", (workspace, name)).fetchone()
+            if not category:
+                raise ValueError("This category no longer exists")
+            self.db.execute("UPDATE notes SET collection='',updated=? WHERE workspace=? AND collection=?",
+                            (time.time(), workspace, category["name"]))
+            self.db.execute("DELETE FROM categories WHERE workspace=? AND name=?", (workspace, name))
+
+    def reorder_categories(self, workspace, names):
+        with self.lock, self.db:
+            existing = {row[0] for row in self.db.execute("SELECT name FROM categories WHERE workspace=?", (workspace,))}
+            if not isinstance(names, list) or len(names) != len(existing) or set(names) != existing:
+                raise ValueError("The categories changed. Try ordering them again.")
+            self.db.executemany("UPDATE categories SET position=? WHERE workspace=? AND name=?",
+                                [(position, workspace, name) for position, name in enumerate(names)])
 
     def catalog(self):
         with self.lock:
             workspaces = [dict(row) for row in self.db.execute("SELECT * FROM workspaces ORDER BY name COLLATE NOCASE")]
-            categories = [dict(row) for row in self.db.execute("""SELECT c.*, COUNT(n.id) AS count FROM categories c
+            categories = [dict(row) for row in self.db.execute("""SELECT c.workspace,c.name, COUNT(n.id) AS count FROM categories c
                 LEFT JOIN notes n ON n.workspace=c.workspace AND n.collection=c.name AND n.deleted=0
-                GROUP BY c.workspace,c.name ORDER BY c.name COLLATE NOCASE""")]
+                GROUP BY c.workspace,c.name ORDER BY c.position,c.name COLLATE NOCASE""")]
             return workspaces, categories
 
     def browse(self, workspace="inbox", collection=None, search="", trash=False, limit=100):
@@ -161,10 +221,11 @@ class Store:
         where = " AND ".join(clauses)
         with self.lock:
             total = self.db.execute(f"SELECT COUNT(*) FROM notes n WHERE {where}", args).fetchone()[0]
-            rows = self.db.execute(f"""SELECT n.id,n.title,n.collection,n.workspace,n.created,n.duration,n.status,n.deleted,
+            rows = self.db.execute(f"""SELECT n.id,n.title,n.collection,n.workspace,n.created,n.updated,n.duration,n.status,n.deleted,
+                substr(n.body,1,180) AS preview,
                 (SELECT COUNT(*) FROM segments s WHERE s.note_id=n.id AND s.state!='done') AS pending,
                 (SELECT COUNT(*) FROM segments s WHERE s.note_id=n.id AND s.state='error') AS errors
-                FROM notes n WHERE {where} ORDER BY n.created DESC LIMIT ?""", (*args, max(100, limit)))
+                FROM notes n WHERE {where} ORDER BY n.created DESC LIMIT ?""", (*args, -1 if limit == -1 else max(100, limit)))
             return [dict(row) for row in rows], total
 
     def document(self, note_id):

@@ -14,6 +14,7 @@ def emit(value):
 def main():
     # Keep the protocol uncontaminated by dependency progress output.
     with contextlib.redirect_stdout(sys.stderr):
+        import mlx.core as mx
         import numpy as np
         from scipy.signal import resample_poly
         from fermion.transcribe import _resolve
@@ -25,7 +26,12 @@ def main():
         # Packed weights save memory. The package default densifies the encoder.
         os.environ.setdefault("FERMION_P2_FAST", "tdt16")
         speech = backends.load("mlx", path, profile=key, backend=pin["backend"], quiet=True)
+        # MLX keeps freed GPU buffers for reuse, up to about 15 GB on a 16 GB Mac by default.
+        # Every segment length leaves differently sized buffers, so a long-running engine
+        # grew to 10 GB of cache around 0.4 GB of model. Cap it and empty it after each request.
+        mx.set_cache_limit(512 << 20)
         speech.transcribe_array_detailed(np.zeros(16000, dtype=np.float32))
+        mx.clear_cache()
     emit({"event": "ready"})
     for line in sys.stdin:
         try:
@@ -49,6 +55,8 @@ def main():
             emit({"event": "result", "id": request["id"], "text": " ".join(texts), "words": words})
         except Exception as exc:
             emit({"event": "error", "message": str(exc)})
+        finally:
+            mx.clear_cache()
 
 
 if __name__ == "__main__":

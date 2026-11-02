@@ -4,23 +4,27 @@ import QtQuick.Controls
 import QtQuick.Layouts
 import QtQuick.Dialogs
 import QtCore
+import "Theme.js" as T
 
 ApplicationWindow {
     id: window
     width: Qt.application.arguments.indexOf("--compact") >= 0 ? 800 : 1280
     height: Qt.application.arguments.indexOf("--compact") >= 0 ? 620 : 900
     minimumWidth: 760; minimumHeight: 580
-    visible: true; title: "Fieldnotes"; color: "#f3f7f0"
+    visible: true; title: "Fieldnotes"; color: T.p.ground
     flags: Qt.Window | Qt.ExpandedClientAreaHint | Qt.NoTitleBarBackgroundHint
-    // The background extends through the native title bar; ApplicationWindow
-    // keeps interactive content inside the system-reported safe area.
-    background: Item {
-        Rectangle { width: 264; height: parent.height; color: "#eaf0e5" }
-        Rectangle { x: 264; width: 1; height: parent.height; color: "#dfe6d8" }
-    }
-    palette.window: "#fbfcf7"; palette.base: "#f9faf5"; palette.button: "#e8edde"
-    palette.buttonText: "#293d2b"; palette.text: "#293d2b"
-    palette.placeholderText: "#7b8872"; palette.highlight: "#dfe8d5"; palette.highlightedText: "#293d2b"
+    // The ground extends through the native title bar; ApplicationWindow keeps
+    // interactive content inside the system-reported safe area.
+    background: Rectangle { color: T.p.ground }
+    font.family: T.sans
+    palette.window: T.p.ground; palette.windowText: T.p.ink; palette.base: T.p.cell; palette.alternateBase: T.p.panel
+    palette.button: T.p.cell; palette.buttonText: T.p.ink; palette.text: T.p.ink; palette.brightText: T.p.ink
+    palette.placeholderText: T.p.muted; palette.highlight: T.p.accent; palette.highlightedText: T.p.floodInk
+    palette.toolTipBase: T.p.cell; palette.toolTipText: T.p.ink; palette.dark: T.p.cell; palette.mid: T.p.dim; palette.light: T.p.cell; palette.shadow: T.p.ground
+    FontLoader { source: "../assets/fonts/Geist-Regular.ttf" }
+    FontLoader { source: "../assets/fonts/Geist-Medium.ttf" }
+    FontLoader { source: "../assets/fonts/GeistMono-Regular.ttf" }
+    FontLoader { source: "../assets/fonts/DSEG14Modern-Regular.ttf" }
     // qmllint disable unqualified
     property var c: appController
     // qmllint enable unqualified
@@ -30,24 +34,19 @@ ApplicationWindow {
     function chooseRecordingWorkspace(workspace) { recordingWorkspace = workspace; recordingCategory = "" }
     property string chosenCategory: "*"
     property bool trash: false
+    property bool organising: false
+    readonly property string section: organising ? "organise" : trash ? "trash" : "notes"
+    function chooseSection(name) {
+        if (name === "organise") { organising = true; return }
+        organising = false
+        if (trash !== (name === "trash")) { trash = name === "trash"; chosenCategory = "*" }
+    }
     property int deviceId: -1
     property bool syncing: false
     property bool queryStarted: false
-    property int findPosition: -1
+    property bool focusedWriting: false
+    property bool focusNewNote: false
     function workspaceName(id) { let w = c.workspaces.find(n => n.id === id); return w ? w.name : "" }
-    function revealCursor() {
-        if ((!editor.activeFocus && !transcriptSearch.activeFocus) || syncing) return
-        let y = editor.cursorRectangle.y
-        transcriptView.contentY = Math.max(0, Math.min(transcriptView.contentHeight - transcriptView.height, y < transcriptView.contentY ? y : y + editor.cursorRectangle.height > transcriptView.contentY + transcriptView.height ? y + editor.cursorRectangle.height - transcriptView.height : transcriptView.contentY))
-    }
-    function findTranscript(backwards) {
-        let needle = transcriptSearch.text.toLowerCase(), haystack = editor.text.toLowerCase()
-        if (!needle) { findPosition = -1; editor.deselect(); return }
-        let position = backwards ? haystack.lastIndexOf(needle, findPosition > 0 ? findPosition - 1 : haystack.length) : haystack.indexOf(needle, findPosition < 0 ? 0 : findPosition + needle.length)
-        if (position < 0) position = backwards ? haystack.lastIndexOf(needle) : haystack.indexOf(needle)
-        findPosition = position
-        if (position >= 0) { editor.cursorPosition = position; editor.select(position, position + needle.length); revealCursor() } else editor.deselect()
-    }
     property string loadedId: ""
     property string notice: ""
     property bool undoVisible: false
@@ -56,40 +55,65 @@ ApplicationWindow {
     property string creationError: ""
     property bool reducedMotion: preferences.reduceMotion || c.systemReduceMotion
     property var contextNote: ({})
+    property var contextNoteIds: []
+    property bool selectingNotes: false
+    readonly property bool showNoteSelection: selectingNotes || c.selectedNoteIds.length > 1
     property string renameTarget: ""
     property string contextCategory: ""
     function canTrash(note) { return !!(note && note.id && !note.deleted && note.status !== "recording" && note.status !== "paused" && (note.pending || 0) <= (note.errors || 0)) }
-    function openNoteMenu(note, item, x, y) { contextNote = note; sidebarNoteMenu.popup(item, x, y) }
+    function openNoteMenu(note, item, x, y) {
+        contextNote = note
+        contextNoteIds = c.selectedNoteIds.indexOf(note.id) >= 0 ? c.selectedNoteIds.slice() : [note.id]
+        sidebarNoteMenu.popup(item, x, y)
+    }
+    function chooseNote(id, modifiers) {
+        if (trash) { c.selectNote(id); return }
+        if (!selectingNotes && !c.selectedNoteIds.length && modifiers & (Qt.ControlModifier | Qt.ShiftModifier)) c.selectNoteRow(c.selectedId)
+        c.selectNoteRow(id, selectingNotes || !!(modifiers & Qt.ControlModifier), !!(modifiers & Qt.ShiftModifier))
+    }
+    function finishSelection() { selectingNotes = false; c.clearNoteSelection() }
+    function openMove(ids, workspace) {
+        moveDialog.noteIds = ids.slice()
+        moveDialog.workspace = workspace
+        moveDialog.errorText = ""
+        moveCategory.currentIndex = 0
+        moveDialog.open()
+        moveCategory.forceActiveFocus()
+    }
     function renameNote(id) {
         renameTarget = id
         if (c.selectedId === id) { titleField.forceActiveFocus(); titleField.selectAll(); renameTarget = "" }
         else c.selectNote(id)
     }
-    property var categoryRows: [{name: "All notes", value: "*"}, {name: "Unfiled", value: ""}].concat(
+    property var categoryRows: [{name: "all notes", value: "*"}, {name: "unfiled", value: ""}].concat(
         c.categories.filter(n => n.workspace === chosenWorkspace).map(n => ({name: n.name, value: n.name, count: n.count})))
-    property var noteCategories: [{name: "Unfiled", value: ""}].concat(
+    property var noteCategories: [{name: "unfiled", value: ""}].concat(
         c.categories.filter(n => n.workspace === c.workspace).map(n => ({name: n.name, value: n.name})))
-    Settings { id: preferences; location: window.c.settingsFile; property double voiceDb: -72; property bool reduceMotion: false; property string lastWorkspace: "inbox" }
-    function refreshQuery() { if (c.connected) c.query(chosenWorkspace, chosenCategory, searchField.text, trash) }
+    Settings { id: preferences; location: window.c.settingsFile; property double voiceDb: -72; property bool reduceMotion: false; property string lastWorkspace: "inbox"; property string theme: "instrument-light" }
+    Binding { target: T.p; property: "themeId"; value: preferences.theme }
+    // Native dialogs, menus and the title bar follow the theme's appearance.
+    Binding { target: Qt.styleHints; property: "colorScheme"; value: T.p.light ? Qt.ColorScheme.Light : Qt.ColorScheme.Dark }
+    function refreshQuery() { finishSelection(); if (c.connected) c.query(chosenWorkspace, organising ? "*" : chosenCategory, organising ? organiser.search : searchField.text, organising ? false : trash, organising) }
+    onOrganisingChanged: refreshQuery()
     function currentCategory() { return chosenCategory === "*" || trash ? "" : chosenCategory }
     function recordToggle() { if (c.connected) { if (c.recording) c.stop(); else c.record(deviceId, recordingCategory, recordingWorkspace, preferences.voiceDb) } }
-    function newNote() { c.newNote(currentCategory(), chosenWorkspace) }
-    function focusedEditor() { return titleField.activeFocus ? titleField : editor }
+    function newNote(category) {
+        if (organising) organiser.newNote(category === undefined ? "" : category)
+        else { focusedWriting = true; focusNewNote = true; c.newNote(category === undefined ? currentCategory() : category, chosenWorkspace) }
+    }
+    function focusedEditor() { return organising ? organiser.focusedEditor() : titleField.activeFocus ? titleField : noteEditor.focusedEditor() }
     function showNotice(text, undo) { notice = text; undoVisible = undo || false; noticeTimer.restart() }
     function create(kind) { creationKind = kind; creating = false; creationError = ""; creationName.text = ""; creationDialog.open(); creationName.forceActiveFocus() }
     function loadDocument() {
         syncing = true
         let changed = loadedId !== c.selectedId
-        let follow = !changed && transcriptView.contentY >= Math.max(0, transcriptView.contentHeight - transcriptView.height) - 24
-        if (titleField.text !== c.title) titleField.text = c.title
-        if (editor.text !== c.body) {
-            let position = editor.cursorPosition
-            editor.text = c.body
-            editor.cursorPosition = changed ? 0 : Math.min(position, editor.length)
+        if (titleField.text !== c.title) {
+            titleField.text = c.title
+            if (!titleField.activeFocus) titleField.cursorPosition = 0
         }
+        noteEditor.loadDocument(c.selectedId, c.body)
         loadedId = c.selectedId
-        if (changed) { transcriptSearch.text = ""; findPosition = -1 }
-        if (changed || follow) Qt.callLater(function() { transcriptView.contentY = changed ? 0 : Math.max(0, transcriptView.contentHeight - transcriptView.height) })
+        if (changed && focusNewNote) { focusNewNote = false; Qt.callLater(function() { noteEditor.focusEditor() }) }
         syncing = false
         if (renameTarget === c.selectedId) Qt.callLater(function() { titleField.forceActiveFocus(); titleField.selectAll(); renameTarget = "" })
     }
@@ -102,9 +126,18 @@ ApplicationWindow {
         function onCopied() { copyButton.confirm() }
         function onExported() { window.showNotice("Note exported", false) }
         function onDeleted() { window.showNotice("Moved to Trash", true) }
+        function onNotesMoved(count, collection) {
+            moveDialog.close()
+            window.finishSelection()
+            window.showNotice(count + (count === 1 ? " note moved to " : " notes moved to ") + (collection || "Unfiled"), false)
+        }
         function onWorkspaceCreated(id) { window.creating = false; creationDialog.close(); window.chosenWorkspace = id }
-        function onCategoryCreated(name) { window.creating = false; creationDialog.close(); window.chosenCategory = name; window.trash = false; window.refreshQuery() }
-        function onErrorChanged() { if (window.creating && window.c.error) { window.creationError = window.c.error; window.creating = false } }
+        function onCategoryCreated(name) { window.creating = false; creationDialog.close(); if (!window.organising) window.chosenCategory = name; window.trash = false; window.refreshQuery() }
+        function onCategoryChanged(message) { window.showNotice(message, false) }
+        function onErrorChanged() {
+            if (window.creating && window.c.error) { window.creationError = window.c.error; window.creating = false }
+            if (moveDialog.visible && window.c.error) moveDialog.errorText = window.c.error
+        }
         function onStateChanged() {
             if (!window.c.connected) window.queryStarted = false
             if (window.c.connected && !window.queryStarted) { window.queryStarted = true; window.refreshQuery() }
@@ -115,26 +148,30 @@ ApplicationWindow {
     Timer { id: searchTimer; interval: 180; onTriggered: window.refreshQuery() }
     Shortcut { sequence: "Meta+Shift+P"; enabled: window.c.recording; onActivated: window.c.pause() }
     Shortcut { sequence: "Meta+Shift+C"; enabled: !!window.c.body; onActivated: window.c.copy() }
-    Shortcut { sequences: [StandardKey.Find]; onActivated: transcriptSearch.forceActiveFocus() }
-    Shortcut { sequence: "Meta+Shift+F"; onActivated: searchField.forceActiveFocus() }
+    Shortcut { sequences: [StandardKey.Find]; onActivated: window.organising ? organiser.findInEditor() : noteEditor.focusSearch() }
+    Shortcut { sequence: "Meta+Shift+F"; onActivated: window.organising ? organiser.focusSearch() : searchField.forceActiveFocus() }
     Shortcut { sequence: "Meta+E"; enabled: !!window.c.selectedId; onActivated: exportDialog.open() }
     Shortcut { sequence: "Escape"; enabled: noteDragGhost.dragging; onActivated: { noteDragGhost.Drag.cancel(); noteDragGhost.dragging = false } }
     FieldMenu {
         id: sidebarNoteMenu
-        FieldMenuItem { text: "Copy transcript"; onTriggered: window.c.copyNote(window.contextNote.id) }
-        FieldMenuItem { text: "Rename note"; enabled: !window.contextNote.deleted; onTriggered: window.renameNote(window.contextNote.id) }
-        FieldMenuItem { text: "Retry unfinished audio"; enabled: (window.contextNote.errors || 0) > 0; onTriggered: window.c.retry(window.contextNote.id) }
-        MenuSeparator { padding: 4; contentItem: Rectangle { implicitHeight: 1; color: "#dce2d4" } }
+        FieldMenuItem { text: "Copy transcript"; enabled: window.contextNoteIds.length === 1; onTriggered: window.c.copyNote(window.contextNote.id) }
+        FieldMenuItem { text: "Rename note"; enabled: window.contextNoteIds.length === 1 && !window.contextNote.deleted; onTriggered: window.renameNote(window.contextNote.id) }
+        FieldMenuItem { text: "Retry unfinished audio"; enabled: window.contextNoteIds.length === 1 && (window.contextNote.errors || 0) > 0; onTriggered: window.c.retry(window.contextNote.id) }
+        FieldMenuItem {
+            text: window.contextNoteIds.length > 1 ? "Move " + window.contextNoteIds.length + " notes to category…" : "Move to category…"
+            enabled: !window.contextNote.deleted && window.c.connected && !window.c.moving
+            onTriggered: window.openMove(window.contextNoteIds, window.contextNote.workspace)
+        }
+        FieldMenuGap { }
         FieldMenuItem {
             text: window.contextNote.deleted ? "Restore note" : "Move note to Trash"
-            enabled: !!window.contextNote.deleted || window.canTrash(window.contextNote)
+            enabled: window.contextNoteIds.length === 1 && (!!window.contextNote.deleted || window.canTrash(window.contextNote))
             onTriggered: window.contextNote.deleted ? window.c.restoreNote(window.contextNote.id) : window.c.trashNote(window.contextNote.id)
-            ToolTip.visible: hovered && !enabled; ToolTip.text: "Stop recording and finish transcription before moving this note to Trash."
         }
     }
     FieldMenu {
         id: categoryMenu
-        FieldMenuItem { text: "New note in this category"; onTriggered: window.c.newNote(window.contextCategory, window.chosenWorkspace) }
+        FieldMenuItem { text: "New note in this category"; onTriggered: window.newNote(window.contextCategory) }
         FieldMenuItem { text: "New category…"; onTriggered: window.create("category") }
     }
     FieldMenu {
@@ -150,12 +187,49 @@ ApplicationWindow {
         property string noteTitle: ""
         property bool dragging: false
         visible: dragging; width: 210; height: 38; z: 100
-        color: "#e4ecdd"; radius: 6; border.color: "#8ea782"; opacity: .94
+        color: T.p.ink
         Drag.active: dragging; Drag.source: noteDragGhost; Drag.keys: ["fieldnotes-note"]
         Drag.supportedActions: Qt.MoveAction; Drag.hotSpot.x: width / 2; Drag.hotSpot.y: height / 2
-        Text { anchors.fill: parent; anchors.margins: 10; text: noteDragGhost.noteTitle; color: "#293c2a"; font.pixelSize: 12; elide: Text.ElideRight; verticalAlignment: Text.AlignVCenter }
+        Text { anchors.fill: parent; anchors.margins: 10; text: noteDragGhost.noteTitle; color: T.p.floodInk; font.family: T.mono; font.pixelSize: T.value; elide: Text.ElideRight; verticalAlignment: Text.AlignVCenter }
     }
     FileDialog { id: exportDialog; title: "Export note"; fileMode: FileDialog.SaveFile; nameFilters: ["Markdown notes (*.md)", "Text files (*.txt)"]; defaultSuffix: "md"; onAccepted: window.c.exportNote(selectedFile) }
+    FieldDialog {
+        id: moveDialog
+        property var noteIds: []
+        property string workspace: ""
+        property string errorText: ""
+        anchors.centerIn: parent; width: 360
+        title: noteIds.length === 1 ? "Move note to category" : "Move " + noteIds.length + " notes to category"
+        closePolicy: window.c.moving ? Popup.NoAutoClose : Popup.CloseOnEscape | Popup.CloseOnPressOutside
+        contentItem: ColumnLayout {
+            spacing: 12
+            RowLayout {
+                Layout.fillWidth: true
+                Text { text: "workspace"; color: T.p.ink; font.family: T.sans; font.pixelSize: T.label }
+                Item { Layout.fillWidth: true }
+                Text { text: window.workspaceName(moveDialog.workspace); color: T.p.muted; font.family: T.mono; font.pixelSize: T.value }
+            }
+            Text { text: "category"; color: T.p.ink; font.family: T.sans; font.pixelSize: T.label }
+            FieldCombo {
+                id: moveCategory
+                Layout.fillWidth: true; textRole: "name"
+                Accessible.name: "Destination category"
+                enabled: !window.c.moving
+                model: [{name: "unfiled", value: ""}].concat(window.c.categories.filter(n => n.workspace === moveDialog.workspace).map(n => ({name: n.name, value: n.name})))
+            }
+            Text { Layout.fillWidth: true; visible: !!moveDialog.errorText; text: T.lower(moveDialog.errorText); color: T.p.magenta; wrapMode: Text.WordWrap; font.family: T.mono; font.pixelSize: T.value }
+            RowLayout {
+                Layout.fillWidth: true; spacing: 8
+                Item { Layout.fillWidth: true }
+                ActionButton { text: "Cancel"; quiet: true; enabled: !window.c.moving; onClicked: moveDialog.close() }
+                ActionButton {
+                    text: window.c.moving ? "Moving…" : "Move"
+                    enabled: window.c.connected && !window.c.moving && moveCategory.currentIndex >= 0
+                    onClicked: { moveDialog.errorText = ""; window.c.moveNotes(moveDialog.noteIds, moveDialog.workspace, moveCategory.model[moveCategory.currentIndex].value) }
+                }
+            }
+        }
+    }
     FieldDialog {
         id: creationDialog
         anchors.centerIn: parent
@@ -169,39 +243,48 @@ ApplicationWindow {
         }
         contentItem: ColumnLayout {
             spacing: 8
-            TextField { id: creationName; Layout.fillWidth: true; placeholderText: window.creationKind === "workspace" ? "e.g. HCI research" : "e.g. Debugging runs"; Accessible.name: "Name"; selectByMouse: true; enabled: !window.creating; color: "#293d2b"; placeholderTextColor: "#738275"; leftPadding: 10; implicitHeight: 36; background: Rectangle { radius: 5; color: "white"; border.color: creationName.activeFocus ? "#61866c" : "#cbd5c6" } onAccepted: creationDialog.submit(); TextContextMenu { field: creationName } }
-            Text { Layout.fillWidth: true; Layout.preferredHeight: 32; text: window.creationError; color: "#a33d28"; wrapMode: Text.WordWrap; font.pixelSize: 11 }
+            FieldText { id: creationName; Layout.fillWidth: true; placeholderText: "name"; Accessible.name: "Name"; enabled: !window.creating; onAccepted: creationDialog.submit() }
+            Text { Layout.fillWidth: true; Layout.preferredHeight: 32; text: T.lower(window.creationError); color: T.p.magenta; wrapMode: Text.WordWrap; font.family: T.mono; font.pixelSize: T.small }
             RowLayout {
             Layout.fillWidth: true; spacing: 8
             Item { Layout.fillWidth: true }
-            ActionButton { text: "Cancel"; enabled: !window.creating; onClicked: creationDialog.close() }
+            ActionButton { text: "Cancel"; quiet: true; enabled: !window.creating; onClicked: creationDialog.close() }
             ActionButton { text: window.creating ? "Creating…" : "Create"; enabled: !!creationName.text.trim() && !window.creating && window.c.connected; onClicked: creationDialog.submit() }
             }
         }
     }
     FieldDialog {
         id: filterDialog
-        anchors.centerIn: parent; width: 410; modal: true; title: "Voice filter"
+        anchors.centerIn: parent; width: 440; modal: true; title: "Settings"
         contentItem: ColumnLayout {
-            spacing: 14
-            Text { Layout.fillWidth: true; text: "Speech detection is always on. Ignore speech quieter than this level to reduce distant voices."; wrapMode: Text.WordWrap; color: "#40533a"; font.pixelSize: 13 }
-            RowLayout { Layout.fillWidth: true; Text { text: "Quiet voices"; font.pixelSize: 11; color: "#65765c" } Item { Layout.fillWidth: true } Text { text: "Nearby voices"; font.pixelSize: 11; color: "#65765c" } }
-            Slider {
+            spacing: 18
+            RowLayout {
+                Layout.fillWidth: true; spacing: 16
+                Text { text: "theme"; color: T.p.ink; font.family: T.sans; font.pixelSize: T.label }
+                FieldCombo {
+                    id: themePicker
+                    Layout.fillWidth: true
+                    model: T.p.themes; textRole: "name"
+                    currentIndex: Math.max(0, T.p.themes.findIndex(t => t.id === preferences.theme))
+                    Accessible.name: "Theme"
+                    onActivated: preferences.theme = T.p.themes[currentIndex].id
+                }
+            }
+            FieldSlider {
                 id: voiceSlider
-                Layout.fillWidth: true; from: -90; to: -20; stepSize: 1; value: preferences.voiceDb; Accessible.name: "Minimum voice level"; onMoved: preferences.voiceDb = value
-                background: Rectangle { x: voiceSlider.leftPadding; y: (voiceSlider.height - height) / 2; width: voiceSlider.availableWidth; height: 5; radius: 3; color: "#d8e1d5"; Rectangle { width: voiceSlider.visualPosition * parent.width; height: parent.height; radius: 3; color: "#6f987a" } }
-                handle: Rectangle { x: voiceSlider.leftPadding + voiceSlider.visualPosition * (voiceSlider.availableWidth - width); y: (voiceSlider.height - height) / 2; implicitWidth: 22; implicitHeight: 22; radius: 11; color: voiceSlider.pressed ? "#edf3e8" : "white"; border.color: voiceSlider.activeFocus ? "#264e38" : "#76957a"; border.width: 2 }
+                Layout.fillWidth: true
+                label: "minimum level"; unit: "dBFS"
+                from: -90; to: -20; stepSize: 1; value: preferences.voiceDb
+                Accessible.name: "Minimum voice level"; onMoved: preferences.voiceDb = value
             }
-            Text { text: "Minimum voice level: " + Math.round(preferences.voiceDb) + " dBFS"; color: "#40533a"; font.pixelSize: 12 }
-            Text { Layout.fillWidth: true; text: "Applies to new recordings. If your own quiet speech is missed, move towards Quiet voices. Louder background speech can still pass the filter."; wrapMode: Text.WordWrap; color: "#65765c"; font.pixelSize: 11 }
-            CheckBox {
-                id: motionCheck
-                text: "Reduce motion"; checked: preferences.reduceMotion; onToggled: preferences.reduceMotion = checked
-                spacing: 10
-                indicator: Rectangle { x: motionCheck.leftPadding; y: (motionCheck.height - height) / 2; implicitWidth: 20; implicitHeight: 20; radius: 4; color: motionCheck.checked ? "#4c755b" : "#ffffff"; border.color: motionCheck.activeFocus ? "#244332" : "#9daf9e"; border.width: motionCheck.activeFocus ? 2 : 1; Text { anchors.centerIn: parent; text: motionCheck.checked ? "✓" : ""; color: "white"; font.pixelSize: 15 } }
-                contentItem: Text { text: motionCheck.text; color: "#293d2b"; font.pixelSize: 13; leftPadding: motionCheck.indicator.width + motionCheck.spacing; verticalAlignment: Text.AlignVCenter }
+            RowLayout {
+                Layout.fillWidth: true; Layout.topMargin: -12
+                Text { text: "quiet"; font.family: T.mono; font.pixelSize: T.small; color: T.p.muted }
+                Item { Layout.fillWidth: true }
+                Text { text: "near"; font.family: T.mono; font.pixelSize: T.small; color: T.p.muted }
             }
-            RowLayout { Layout.fillWidth: true; Item { Layout.fillWidth: true } ActionButton { text: "Close"; onClicked: filterDialog.close() } }
+            FieldCheck { id: motionCheck; text: "Reduce motion"; checked: preferences.reduceMotion; onToggled: preferences.reduceMotion = checked }
+            RowLayout { Layout.fillWidth: true; Item { Layout.fillWidth: true } ActionButton { text: "Close"; keys: "esc"; onClicked: filterDialog.close() } }
         }
     }
     menuBar: MenuBar {
@@ -213,7 +296,7 @@ ApplicationWindow {
             MenuSeparator { }
             Action { text: window.c.recording ? "Stop recording" : "Record a session"; shortcut: "Meta+R"; onTriggered: window.recordToggle() }
             Action { text: window.c.paused ? "Resume recording" : "Pause recording"; enabled: window.c.recording; onTriggered: window.c.pause() }
-            Action { text: "Voice filter…"; onTriggered: filterDialog.open() }
+            Action { text: "Settings…"; shortcut: StandardKey.Preferences; onTriggered: filterDialog.open() }
             MenuSeparator { }
             Action { text: "Export note…"; enabled: !!window.c.selectedId; onTriggered: exportDialog.open() }
             Action { text: "Quit Fieldnotes"; shortcut: StandardKey.Quit; onTriggered: window.close() }
@@ -225,342 +308,451 @@ ApplicationWindow {
             MenuSeparator { }
             Action { text: "Copy transcript"; enabled: !!window.c.body; onTriggered: window.c.copy() }
             Action { text: "Copy with timestamps"; enabled: !!window.c.body; onTriggered: window.c.copy(true) }
-            Action { text: "Find notes"; onTriggered: searchField.forceActiveFocus() }
+            Action { text: "Find notes"; onTriggered: window.organising ? organiser.focusSearch() : searchField.forceActiveFocus() }
+        }
+        Menu {
+            title: "View"
+            Action { text: "Notes"; shortcut: "Meta+1"; checkable: true; checked: window.section === "notes"; onTriggered: window.chooseSection("notes") }
+            Action { text: "Organise"; shortcut: "Meta+2"; checkable: true; checked: window.section === "organise"; onTriggered: window.chooseSection("organise") }
+            Action { text: "Trash"; shortcut: "Meta+3"; checkable: true; checked: window.section === "trash"; onTriggered: window.chooseSection("trash") }
+            MenuSeparator { }
+            Menu {
+                id: themeMenu
+                title: "Theme"
+                Instantiator {
+                    model: T.p.themes
+                    delegate: Action {
+                        required property var modelData
+                        text: modelData.name; checkable: true
+                        checked: preferences.theme === modelData.id
+                        onTriggered: preferences.theme = modelData.id
+                    }
+                    onObjectAdded: (index, object) => themeMenu.insertAction(index, object)
+                    onObjectRemoved: (index, object) => themeMenu.removeAction(object)
+                }
+            }
         }
     }
-    RowLayout {
+    ColumnLayout {
         anchors.fill: parent; spacing: 0
+
+        // The header is a band, as in Lodo and TapeTop: the band's colour and ink, running up
+        // through the native title bar above the safe area.
         Rectangle {
-            Layout.preferredWidth: 264; Layout.fillHeight: true; color: "#eaf0e5"
-            ColumnLayout {
-                anchors.fill: parent; anchors.margins: 20; spacing: 12
+            Layout.fillWidth: true; Layout.preferredHeight: 56
+            color: T.p.band
+            Rectangle { anchors.bottom: parent.top; width: parent.width; height: 200; color: T.p.band }
+            RowLayout {
+                id: header
+                anchors.fill: parent; anchors.leftMargin: 24; anchors.rightMargin: 24
+                spacing: 22
+                // The titles span the rail's content exactly: the ink of notes starts on its left
+                // line, the ink of trash ends on its right edge, and the gaps between them are
+                // equal. At 26px Geist the n sits 2 in from its box and the h ends 3 short of it.
                 RowLayout {
-                    Layout.fillWidth: true
-                    Text { text: "Fieldnotes"; color: "#263b29"; font.pixelSize: 25; font.weight: Font.DemiBold }
-                    Item { Layout.fillWidth: true }
-                    ActionButton { text: "+"; font.pixelSize: 22; implicitWidth: 34; implicitHeight: 34; padding: 5; background: Rectangle { radius: width / 2; color: "#f8fbf5"; border.color: "#dce6d4" } Accessible.name: "New note"; enabled: window.c.connected; onClicked: window.newNote(); ToolTip.visible: hovered; ToolTip.text: "New note · ⌘N" }
-                }
-                RowLayout {
-                    Layout.fillWidth: true; spacing: 4
-                    FieldCombo {
-                        id: workspacePicker
-                        glyph: "workspace"
-                        Layout.fillWidth: true
-                        model: window.c.workspaces; textRole: "name"
-                        currentIndex: Math.max(0, window.c.workspaces.findIndex(n => n.id === window.chosenWorkspace))
-                        Accessible.name: "Workspace"
-                        onActivated: window.chosenWorkspace = model[currentIndex].id
-                        MouseArea { anchors.fill: parent; acceptedButtons: Qt.RightButton; onPressed: mouse => workspaceMenu.popup(workspacePicker, mouse.x, mouse.y) }
-                    }
-                    ActionButton { text: "+"; quiet: true; Accessible.name: "New workspace"; onClicked: window.create("workspace"); ToolTip.visible: hovered; ToolTip.text: "New workspace" }
-                }
-                TextField {
-                    id: searchField
-                    Layout.fillWidth: true; implicitHeight: 34; placeholderText: "Search this workspace"
-                    font.pixelSize: 12; color: "#293d2b"; leftPadding: 33; selectByMouse: true
-                    FieldIcon { name: "search"; width: 16; height: 16; x: 10; anchors.verticalCenter: parent.verticalCenter; tint: "#7a8d7d" }
-                    Accessible.name: "Search notes"
-                    onTextChanged: searchTimer.restart()
-                    background: Rectangle { color: "#f9faf5"; radius: 5; border.color: searchField.activeFocus ? "#64815a" : "#d5ddcd" }
-                    TextContextMenu { field: searchField }
-                }
-                RowLayout {
-                    Layout.fillWidth: true
-                    Text { text: "CATEGORIES"; color: "#697962"; font.pixelSize: 9; font.letterSpacing: 1.4; font.weight: Font.DemiBold }
-                    Item { Layout.fillWidth: true }
-                    ActionButton { text: "+"; quiet: true; implicitHeight: 24; Accessible.name: "New category"; onClicked: window.create("category"); ToolTip.visible: hovered; ToolTip.text: "New category" }
-                }
-                ListView {
-                    id: categoryList
-                    Layout.fillWidth: true; Layout.preferredHeight: Math.min(contentHeight, 182)
-                    model: window.categoryRows; clip: true; spacing: 2
-                    boundsBehavior: Flickable.StopAtBounds; boundsMovement: Flickable.StopAtBounds
-                    ScrollBar.vertical: ScrollBar { }
-                    delegate: ItemDelegate {
-                        id: categoryDelegate
-                        required property var modelData
-                        width: ListView.view.width; height: 33; leftPadding: 9; rightPadding: 9; hoverEnabled: true
-                        Accessible.name: modelData.name
-                        onClicked: { window.trash = false; window.chosenCategory = modelData.value; window.refreshQuery() }
-                        MouseArea { anchors.fill: parent; acceptedButtons: Qt.RightButton; onPressed: mouse => { window.contextCategory = categoryDelegate.modelData.value === "*" ? "" : categoryDelegate.modelData.value; categoryMenu.popup(categoryDelegate, mouse.x, mouse.y) } }
-                        background: Rectangle { radius: 4; color: !window.trash && window.chosenCategory === categoryDelegate.modelData.value ? "#dce5d3" : categoryDelegate.hovered ? "#e4eadd" : "transparent"; border.width: categoryDelegate.activeFocus ? 1 : 0; border.color: "#55784c" }
-                        contentItem: RowLayout {
-                            spacing: 13
-                            FieldIcon { Layout.preferredWidth: 18; Layout.preferredHeight: 18; name: categoryDelegate.modelData.value === "*" ? "document" : /hci|test/i.test(categoryDelegate.modelData.name) ? "flask" : /debug/i.test(categoryDelegate.modelData.name) ? "gear" : /idea/i.test(categoryDelegate.modelData.name) ? "idea" : "folder" }
-                            Text { Layout.fillWidth: true; text: categoryDelegate.modelData.name; color: "#344c30"; font.pixelSize: 12; elide: Text.ElideRight }
-                            Text { text: categoryDelegate.modelData.count === undefined ? "" : categoryDelegate.modelData.count; color: "#6e7c64"; font.pixelSize: 10 }
-                        }
-                    }
-                }
-                Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; color: "#d4ddcb" }
-                RowLayout {
-                    Layout.fillWidth: true
-                    Text { text: window.trash ? "TRASH" : "NOTES"; color: "#697962"; font.pixelSize: 9; font.letterSpacing: 1.4; font.weight: Font.DemiBold }
-                    Item { Layout.fillWidth: true }
-                    Text { text: window.c.total; color: "#697962"; font.pixelSize: 11 }
-                }
-                ListView {
-                    id: noteList
-                    Layout.fillWidth: true; Layout.fillHeight: true; clip: true; spacing: 2
-                    model: window.c.notes
-                    boundsBehavior: Flickable.StopAtBounds; boundsMovement: Flickable.StopAtBounds
-                    flickDeceleration: 5000; maximumFlickVelocity: 1400
-                    ScrollBar.vertical: ScrollBar { }
-                    onAtYEndChanged: if (atYEnd && count < window.c.total) window.c.loadMore()
-                    delegate: ItemDelegate {
-                        id: noteDelegate
-                        required property var modelData
-                        required property int index
-                        width: ListView.view.width; height: 58
-                        leftPadding: 10; rightPadding: 10; topPadding: 8; bottomPadding: 7; hoverEnabled: true
-                        Accessible.name: modelData.title + ", " + (modelData.collection || "Unfiled")
-                        onClicked: { noteList.currentIndex = index; forceActiveFocus(); window.c.selectNote(modelData.id) }
-                        Keys.onPressed: event => {
-                            if ((event.key === Qt.Key_Delete || event.key === Qt.Key_Backspace) && window.canTrash(modelData)) { window.c.trashNote(modelData.id); event.accepted = true }
-                            else if (event.key === Qt.Key_Menu || (event.key === Qt.Key_F10 && event.modifiers & Qt.ShiftModifier)) { window.openNoteMenu(modelData, noteDelegate, 12, height); event.accepted = true }
-                        }
-                        MouseArea { anchors.fill: parent; acceptedButtons: Qt.RightButton; onPressed: mouse => window.openNoteMenu(noteDelegate.modelData, noteDelegate, mouse.x, mouse.y) }
-                        DragHandler {
-                            id: noteDrag
-                            target: null; acceptedButtons: Qt.LeftButton; acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
-                            enabled: window.canTrash(noteDelegate.modelData)
-                            function positionGhost() {
-                                let p = noteDelegate.mapToItem(noteDragGhost.parent, centroid.position.x, centroid.position.y)
-                                noteDragGhost.x = p.x - noteDragGhost.width / 2
-                                noteDragGhost.y = p.y - noteDragGhost.height / 2
-                            }
-                            onCentroidChanged: if (active && noteDragGhost.dragging) positionGhost()
-                            onActiveChanged: {
-                                if (active) {
-                                    noteDragGhost.noteId = noteDelegate.modelData.id
-                                    noteDragGhost.noteTitle = noteDelegate.modelData.title
-                                    positionGhost(); noteDragGhost.dragging = true
-                                } else {
-                                    if (noteDragGhost.dragging) noteDragGhost.Drag.drop()
-                                    noteDragGhost.dragging = false; noteDragGhost.noteId = ""
-                                }
-                            }
-                            onCanceled: { noteDragGhost.Drag.cancel(); noteDragGhost.dragging = false }
-                        }
-                        background: Rectangle { radius: 4; color: window.c.selectedId === noteDelegate.modelData.id ? "#dce5d3" : noteDelegate.hovered ? "#e4eadd" : "transparent"; border.width: noteDelegate.activeFocus ? 1 : 0; border.color: "#55784c" }
-                        contentItem: ColumnLayout {
-                            spacing: 4
-                            RowLayout {
-                                Layout.fillWidth: true; spacing: 5
-                                Text { Layout.fillWidth: true; text: noteDelegate.modelData.title; font.pixelSize: 12; font.weight: Font.DemiBold; color: "#293c2a"; elide: Text.ElideRight }
-                                Button {
-                                    id: rowCopy
-                                    property bool confirmed: false
-                                    Layout.preferredWidth: 24; Layout.preferredHeight: 24
-                                    padding: 4; hoverEnabled: true
-                                    enabled: window.c.connected
-                                    Accessible.name: confirmed ? "Note copied" : "Copy note: " + noteDelegate.modelData.title
-                                    onClicked: window.c.copyNote(noteDelegate.modelData.id)
-                                    background: Rectangle { radius: 4; color: rowCopy.down ? "#cfdbc5" : rowCopy.hovered ? "#d4dfcb" : "transparent"; border.width: rowCopy.activeFocus ? 1 : 0; border.color: "#55784c" }
-                                    contentItem: Item {
-                                        FieldIcon { anchors.centerIn: parent; width: 14; height: 14; name: "copy"; tint: "#597361"; opacity: rowCopy.confirmed ? 0 : 1 }
-                                        Text { anchors.centerIn: parent; text: "✓"; color: "#365f43"; font.pixelSize: 15; opacity: rowCopy.confirmed ? 1 : 0; Behavior on opacity { NumberAnimation { duration: window.reducedMotion ? 0 : 120 } } }
+                    Layout.preferredWidth: 290 - 36 + 2 + 3; Layout.leftMargin: -2; Layout.fillWidth: false
+                    spacing: 0
+                    Repeater {
+                        model: ["notes", "", "organise", "", "trash"]
+                        delegate: Item {
+                            id: titleSlot
+                            required property string modelData
+                            // The blank slots are the equal gaps between the titles.
+                            Layout.fillWidth: !modelData
+                            implicitWidth: modelData ? sectionTitle.implicitWidth : 0
+                            implicitHeight: sectionTitle.implicitHeight
+                            Text {
+                                id: sectionTitle
+                                visible: !!titleSlot.modelData
+                                readonly property string name: titleSlot.modelData
+                                readonly property bool current: window.section === name
+                                readonly property bool dropping: name === "trash" && trashDrop.containsDrag
+                                text: name
+                                font.family: T.sans; font.pixelSize: T.section
+                                color: dropping ? T.p.floodInk : current ? T.p.bandInk : sectionHover.hovered ? T.alpha(T.p.bandInk, .75) : T.p.bandMuted
+                                Accessible.role: Accessible.PageTab; Accessible.name: name; Accessible.selected: current
+                                Rectangle { visible: sectionTitle.dropping; z: -1; anchors.fill: parent; anchors.margins: -4; color: T.p.accent }
+                                HoverHandler { id: sectionHover; cursorShape: Qt.PointingHandCursor }
+                                TapHandler { onTapped: window.chooseSection(sectionTitle.name) }
+                                DropArea {
+                                    id: trashDrop
+                                    anchors.fill: parent; anchors.margins: -8; enabled: sectionTitle.name === "trash"; keys: ["fieldnotes-note"]
+                                    onEntered: drag => { drag.accepted = drag.source === noteDragGhost && !!noteDragGhost.noteId }
+                                    onDropped: drop => {
+                                        if (drop.source === noteDragGhost && noteDragGhost.noteId) { window.c.trashNote(noteDragGhost.noteId); drop.accept(Qt.MoveAction) }
                                     }
-                                    ToolTip.visible: hovered; ToolTip.text: "Copy transcript"
-                                    Timer { id: rowCopyReset; interval: 1800; onTriggered: rowCopy.confirmed = false }
-                                    Connections { target: window.c; function onNoteCopied(id) { if (id === noteDelegate.modelData.id) { rowCopy.confirmed = true; rowCopyReset.restart() } } }
                                 }
-                                Rectangle { Layout.preferredWidth: 5; Layout.preferredHeight: 5; radius: 3; color: "#b44530"; visible: noteDelegate.modelData.status === "recording" || noteDelegate.modelData.status === "paused" }
                             }
+                        }
+                    }
+                }
+                Item { Layout.fillWidth: true }
+                Text { text: "workspace"; color: T.p.bandInk; font.family: T.sans; font.pixelSize: T.label }
+                FieldCombo {
+                    id: workspacePicker
+                    onBand: true
+                    Layout.preferredWidth: window.width < 1000 ? 150 : 200
+                    model: window.c.workspaces; textRole: "name"
+                    currentIndex: Math.max(0, window.c.workspaces.findIndex(n => n.id === window.chosenWorkspace))
+                    Accessible.name: "Workspace"
+                    onActivated: window.chosenWorkspace = model[currentIndex].id
+                    MouseArea { anchors.fill: parent; acceptedButtons: Qt.RightButton; onPressed: mouse => workspaceMenu.popup(workspacePicker, mouse.x, mouse.y) }
+                }
+                ActionButton { text: "+"; quiet: true; onBand: true; Layout.leftMargin: -20; Accessible.name: "New workspace"; onClicked: window.create("workspace") }
+                Row {
+                    spacing: 8
+                    Rectangle {
+                        anchors.verticalCenter: parent.verticalCenter; width: 8; height: 8
+                        color: window.c.engineStatus === "ready" ? T.p.bandInk : window.c.engineStatus === "error" ? T.p.magenta : T.p.amber
+                    }
+                    Text {
+                        text: "phonon-2"; font.family: T.mono; font.pixelSize: T.value; color: T.p.bandMuted
+                        ToolTip.visible: engineHover.hovered && window.c.engineStatus === "error"; ToolTip.text: T.lower(window.c.engineError)
+                        HoverHandler { id: engineHover }
+                    }
+                }
+            }
+        }
+
+        Item {
+            Layout.fillWidth: true; Layout.fillHeight: true
+
+            RowLayout {
+                anchors.fill: parent; anchors.margins: 6; spacing: 6; visible: !window.organising
+                Rectangle {
+                    Layout.preferredWidth: 290; Layout.fillHeight: true; color: T.p.panel
+                    ColumnLayout {
+                        anchors.fill: parent; anchors.margins: 18
+                        spacing: window.height < 700 ? 8 : 12
+                        ActionButton { text: "New note"; keys: "⌘N"; Layout.fillWidth: true; enabled: window.c.connected; onClicked: window.newNote() }
+                        FieldText {
+                            id: searchField
+                            Layout.fillWidth: true; placeholderText: "search"
+                            Accessible.name: "Search notes"
+                            onTextChanged: searchTimer.restart()
+                        }
+                        RowLayout {
+                            Layout.fillWidth: true; Layout.topMargin: 4; visible: !window.trash
+                            Text { text: "categories"; color: T.p.muted; font.family: T.sans; font.pixelSize: 13 }
+                            Item { Layout.fillWidth: true }
+                            ActionButton { text: "+"; quiet: true; implicitHeight: 22; Accessible.name: "New category"; onClicked: window.create("category") }
+                        }
+                        ListView {
+                            id: categoryList
+                            PixelScroll { viewport: categoryList }
+                            visible: !window.trash
+                            Layout.fillWidth: true; Layout.preferredHeight: Math.min(contentHeight, window.height * 0.26)
+                            model: window.categoryRows; clip: true; spacing: 0
+                            boundsBehavior: Flickable.StopAtBounds; boundsMovement: Flickable.StopAtBounds
+                            ScrollBar.vertical: FieldScrollBar { }
+                            delegate: ItemDelegate {
+                                id: categoryDelegate
+                                required property var modelData
+                                readonly property bool current: !window.trash && window.chosenCategory === modelData.value
+                                readonly property color inkColour: visualFocus || current ? T.p.floodInk : T.p.ink
+                                width: ListView.view.width; height: 28; leftPadding: 10; rightPadding: 10; topPadding: 0; bottomPadding: 0; hoverEnabled: true
+                                Accessible.name: modelData.name
+                                onClicked: { window.trash = false; window.chosenCategory = modelData.value; window.refreshQuery() }
+                                MouseArea { anchors.fill: parent; acceptedButtons: Qt.RightButton; onPressed: mouse => { window.contextCategory = categoryDelegate.modelData.value === "*" ? "" : categoryDelegate.modelData.value; categoryMenu.popup(categoryDelegate, mouse.x, mouse.y) } }
+                                background: Rectangle { color: categoryDelegate.visualFocus ? T.p.accent : categoryDelegate.current ? T.p.ink : categoryDelegate.hovered ? T.p.cell : "transparent" }
+                                contentItem: RowLayout {
+                                    spacing: 10
+                                    Text { Layout.fillWidth: true; text: categoryDelegate.modelData.name; color: categoryDelegate.inkColour; font.family: T.sans; font.pixelSize: 13; elide: Text.ElideRight }
+                                    Text { text: categoryDelegate.modelData.count === undefined ? "" : categoryDelegate.modelData.count; color: categoryDelegate.visualFocus || categoryDelegate.current ? T.alpha(T.p.floodInk, .6) : T.p.muted; font.family: T.mono; font.pixelSize: T.small }
+                                }
+                            }
+                        }
+                        RowLayout {
+                            Layout.fillWidth: true; Layout.topMargin: 4; spacing: 8
+                            Text { text: window.trash ? "in trash" : "notes"; color: T.p.muted; font.family: T.sans; font.pixelSize: 13 }
+                            Text { text: window.c.total; color: T.p.muted; font.family: T.mono; font.pixelSize: T.small }
+                            Item { Layout.fillWidth: true }
+                            ActionButton {
+                                text: window.showNoteSelection ? "Done" : "Select"
+                                quiet: !window.showNoteSelection; highlighted: window.showNoteSelection; implicitHeight: 22; visible: !window.trash
+                                enabled: window.c.connected && noteList.count > 0
+                                Accessible.name: window.showNoteSelection ? "Finish selecting notes" : "Select multiple notes"
+                                onClicked: { if (window.showNoteSelection) window.finishSelection(); else { window.c.clearNoteSelection(); window.selectingNotes = true } }
+                            }
+                        }
+                        RowLayout {
+                            Layout.fillWidth: true; spacing: 2; visible: window.showNoteSelection && !window.trash
+                            Text { Layout.fillWidth: true; text: window.c.selectedNoteIds.length + " selected"; color: T.p.ink; font.family: T.mono; font.pixelSize: T.value }
+                            ActionButton { text: "All"; quiet: true; Accessible.name: noteList.count < window.c.total ? "Select all loaded notes" : "Select all notes"; onClicked: window.c.selectAllNotes() }
+                            ActionButton { text: "Move"; enabled: window.c.connected && window.c.selectedNoteIds.length > 0 && !window.c.moving; onClicked: window.openMove(window.c.selectedNoteIds, window.chosenWorkspace) }
+                        }
+                        // The list shows whole rows only: its height snaps to the row pitch, and the
+                        // last row ends on the panel's edge rather than half-cut above blank space.
+                        Item {
+                            id: noteListFrame
+                            Layout.fillWidth: true; Layout.fillHeight: true; Layout.minimumHeight: 52
+                        ListView {
+                            id: noteList
+                            PixelScroll { viewport: noteList }
+                            width: parent.width; height: Math.max(52, Math.floor(parent.height / 52) * 52); clip: true; spacing: 0
+                            model: window.c.notes
+                            boundsBehavior: Flickable.StopAtBounds; boundsMovement: Flickable.StopAtBounds
+                            ScrollBar.vertical: FieldScrollBar { }
+                            Keys.onPressed: event => {
+                                if (window.trash) return
+                                if (event.matches(StandardKey.SelectAll)) { window.selectingNotes = true; window.c.selectAllNotes(); event.accepted = true }
+                                else if (event.key === Qt.Key_Escape && window.showNoteSelection) { window.finishSelection(); event.accepted = true }
+                            }
+                            onAtYEndChanged: if (atYEnd && count < window.c.total) window.c.loadMore()
+                            delegate: ItemDelegate {
+                                id: noteDelegate
+                                required property var modelData
+                                required property int index
+                                width: ListView.view.width; height: 52
+                                leftPadding: 10; rightPadding: 6; topPadding: 8; bottomPadding: 8; hoverEnabled: true
+                                Accessible.name: modelData.title + ", " + (modelData.collection || "Unfiled")
+                                property bool selectedForMove: window.c.selectedNoteIds.indexOf(modelData.id) >= 0
+                                readonly property bool current: window.showNoteSelection || window.c.selectedNoteIds.length ? selectedForMove : window.c.selectedId === modelData.id
+                                readonly property bool inverted: current || visualFocus
+                                readonly property var noteState: T.noteState(modelData)
+                                Accessible.role: Accessible.ListItem
+                                Accessible.selected: selectedForMove
+                                onClicked: { noteList.currentIndex = index; forceActiveFocus(); window.chooseNote(modelData.id, Qt.NoModifier) }
+                                Keys.onPressed: event => {
+                                    if ((event.key === Qt.Key_Delete || event.key === Qt.Key_Backspace) && !window.showNoteSelection && window.canTrash(modelData)) { window.c.trashNote(modelData.id); event.accepted = true }
+                                    else if (event.key === Qt.Key_Space && !window.trash) { window.chooseNote(modelData.id, event.modifiers); event.accepted = true }
+                                    else if (event.key === Qt.Key_Menu || (event.key === Qt.Key_F10 && event.modifiers & Qt.ShiftModifier)) { window.openNoteMenu(modelData, noteDelegate, 12, height); event.accepted = true }
+                                }
+                                MouseArea {
+                                    anchors.fill: parent; acceptedButtons: Qt.LeftButton | Qt.RightButton
+                                    onClicked: mouse => {
+                                        if (mouse.button === Qt.RightButton) window.openNoteMenu(noteDelegate.modelData, noteDelegate, mouse.x, mouse.y)
+                                        else { noteList.currentIndex = noteDelegate.index; noteDelegate.forceActiveFocus(); window.chooseNote(noteDelegate.modelData.id, mouse.modifiers) }
+                                    }
+                                }
+                                DragHandler {
+                                    id: noteDrag
+                                    target: null; acceptedButtons: Qt.LeftButton; acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
+                                    enabled: !window.showNoteSelection && window.canTrash(noteDelegate.modelData)
+                                    function positionGhost() {
+                                        let p = noteDelegate.mapToItem(noteDragGhost.parent, centroid.position.x, centroid.position.y)
+                                        noteDragGhost.x = p.x - noteDragGhost.width / 2
+                                        noteDragGhost.y = p.y - noteDragGhost.height / 2
+                                    }
+                                    onCentroidChanged: if (active && noteDragGhost.dragging) positionGhost()
+                                    onActiveChanged: {
+                                        if (active) {
+                                            noteDragGhost.noteId = noteDelegate.modelData.id
+                                            noteDragGhost.noteTitle = noteDelegate.modelData.title
+                                            positionGhost(); noteDragGhost.dragging = true
+                                        } else {
+                                            if (noteDragGhost.dragging) noteDragGhost.Drag.drop()
+                                            noteDragGhost.dragging = false; noteDragGhost.noteId = ""
+                                        }
+                                    }
+                                    onCanceled: { noteDragGhost.Drag.cancel(); noteDragGhost.dragging = false }
+                                }
+                                background: Rectangle { color: noteDelegate.visualFocus ? T.p.accent : noteDelegate.current ? T.p.ink : noteDelegate.hovered ? T.p.cell : "transparent" }
+                                contentItem: RowLayout {
+                                    spacing: 10
+                                    FieldCheck {
+                                        id: noteCheck
+                                        visible: window.showNoteSelection; checked: noteDelegate.selectedForMove
+                                        Layout.preferredWidth: 12
+                                        Accessible.name: "Select note: " + noteDelegate.modelData.title
+                                        onCheckedChanged: if (checked !== noteDelegate.selectedForMove) window.c.selectNoteRow(noteDelegate.modelData.id, true)
+                                    }
+                                    ColumnLayout {
+                                        Layout.fillWidth: true
+                                        spacing: 3
+                                        RowLayout {
+                                            Layout.fillWidth: true; spacing: 6
+                                            Text { Layout.fillWidth: true; text: noteDelegate.modelData.title; font.family: T.sans; font.pixelSize: 13; color: noteDelegate.inverted ? T.p.floodInk : T.p.ink; elide: Text.ElideRight }
+                                            Rectangle { Layout.preferredWidth: 6; Layout.preferredHeight: 6; color: T.p.record; visible: noteDelegate.modelData.status === "recording" || noteDelegate.modelData.status === "paused" }
+                                        }
+                                        RowLayout {
+                                            Layout.fillWidth: true; spacing: 6
+                                            Text {
+                                                Layout.fillWidth: true
+                                                text: (noteDelegate.modelData.collection || "unfiled") + "  " + (noteDelegate.noteState.text || T.date(noteDelegate.modelData.created))
+                                                font.family: T.mono; font.pixelSize: T.small
+                                                color: noteDelegate.inverted ? T.alpha(T.p.floodInk, .6) : T.p.muted; elide: Text.ElideRight
+                                            }
+                                            Rectangle { visible: !!noteDelegate.noteState.text && !noteDelegate.noteState.recording; Layout.preferredWidth: 6; Layout.preferredHeight: 6; color: noteDelegate.noteState.color }
+                                        }
+                                    }
+                                    ActionButton {
+                                        id: rowCopy
+                                        property bool confirmed: false
+                                        visible: (noteDelegate.hovered || noteDelegate.current || confirmed) && !window.showNoteSelection
+                                        text: confirmed ? "copied" : "copy"; quiet: true; implicitHeight: 22; leftPadding: 6; rightPadding: 6
+                                        onBand: noteDelegate.inverted
+                                        enabled: window.c.connected
+                                        Accessible.name: confirmed ? "Note copied" : "Copy note: " + noteDelegate.modelData.title
+                                        onClicked: window.c.copyNote(noteDelegate.modelData.id)
+                                        Timer { id: rowCopyReset; interval: 1800; onTriggered: rowCopy.confirmed = false }
+                                        Connections { target: window.c; function onNoteCopied(id) { if (id === noteDelegate.modelData.id) { rowCopy.confirmed = true; rowCopyReset.restart() } } }
+                                    }
+                                }
+                            }
+                            footer: ActionButton { width: noteList.width; text: "Load more"; quiet: true; visible: noteList.count < window.c.total; height: visible ? 32 : 0; onClicked: window.c.loadMore() }
+                            Text { anchors.centerIn: parent; text: searchField.text ? "no matches" : window.trash ? "trash is empty" : "no notes"; color: T.p.dim; font.family: T.mono; font.pixelSize: T.value; visible: !noteList.count }
+                            MouseArea { anchors.fill: parent; enabled: !noteList.count; acceptedButtons: Qt.RightButton; onPressed: mouse => workspaceMenu.popup(noteList, mouse.x, mouse.y) }
+                        }
+                        }
+                    }
+                }
+                Rectangle {
+                    Layout.fillWidth: true; Layout.fillHeight: true; color: T.p.panel
+                ColumnLayout {
+                    id: mainPane
+                    anchors.fill: parent
+                    readonly property real leftInset: 18
+                    readonly property real rightInset: 18
+                    anchors.topMargin: 18
+                    // Title then toolbar: 36 + 4 puts the toolbar on the rail's search row (18 + 28 + 12).
+                    spacing: 4
+                    RowLayout {
+                        Layout.fillWidth: true; Layout.leftMargin: mainPane.leftInset; Layout.rightMargin: mainPane.rightInset; spacing: 2
+                        TextField {
+                            id: titleField
+                            Layout.fillWidth: true; Layout.minimumWidth: 80; implicitHeight: 36
+                            readOnly: window.c.trashed || !window.c.selectedId
+                            placeholderText: window.c.selectedId ? "untitled" : "no note"
+                            font.family: T.sans; font.pixelSize: 24
+                            // While not editing, the elided copy below stands in, so a long title ends in … rather than a hard cut.
+                            color: activeFocus ? T.p.ink : "transparent"; placeholderTextColor: T.p.dim; padding: 0; leftPadding: 0; selectByMouse: true
+                            selectionColor: T.alpha(T.p.accent, .38); selectedTextColor: T.p.ink
+                            Accessible.name: "Note title"
+                            TextContextMenu { field: titleField }
+                            onTextEdited: if (!window.syncing) window.c.updateTitle(text)
+                            background: Item { }
+                            Text {
+                                anchors.fill: parent; visible: !titleField.activeFocus
+                                text: titleField.text; font: titleField.font; color: T.p.ink
+                                verticalAlignment: Text.AlignVCenter; elide: Text.ElideRight
+                            }
+                        }
+                        ActionButton {
+                            id: locationButton
+                            text: window.workspaceName(window.c.workspace) + " / " + (window.c.collection || "unfiled") + "  ⌄"
+                            font.family: T.mono; font.pixelSize: T.value; lowercase: false
+                            Layout.maximumWidth: window.width < 1000 ? 170 : 260; quiet: true
+                            enabled: !!window.c.selectedId && !window.c.trashed
+                            Accessible.name: "Note location: " + text
+                            onClicked: locationPopup.open()
+                            Popup {
+                                id: locationPopup
+                                x: Math.min(0, locationButton.width - width)
+                                y: locationButton.height; width: 280; padding: 16
+                                background: Rectangle { color: T.p.cell }
+                                contentItem: ColumnLayout {
+                                    spacing: 6
+                                    Text { text: "workspace"; font.family: T.sans; font.pixelSize: 13; color: T.p.ink }
+                                    FieldCombo {
+                                        Layout.fillWidth: true
+                                        model: window.c.workspaces; textRole: "name"; Accessible.name: "Note workspace"
+                                        currentIndex: Math.max(0, window.c.workspaces.findIndex(n => n.id === window.c.workspace))
+                                        onActivated: window.c.updateWorkspace(model[currentIndex].id)
+                                    }
+                                    Text { Layout.topMargin: 8; text: "category"; font.family: T.sans; font.pixelSize: 13; color: T.p.ink }
+                                    FieldCombo {
+                                        Layout.fillWidth: true
+                                        model: window.noteCategories; textRole: "name"; Accessible.name: "Note category"
+                                        currentIndex: Math.max(0, window.noteCategories.findIndex(n => n.value === window.c.collection))
+                                        onActivated: window.c.updateCollection(model[currentIndex].value)
+                                    }
+                                }
+                            }
+                        }
+                        CopyButton { id: copyButton; compact: true; keys: "⌘⇧C"; enabled: !!window.c.body; reduceMotion: window.reducedMotion; onClicked: window.c.copy() }
+                        ActionButton {
+                            id: moreButton
+                            text: "…"; implicitWidth: 28; quiet: true
+                            enabled: !!window.c.selectedId; Accessible.name: "More note actions"
+                            onClicked: noteMenu.popup(moreButton.width - noteMenu.width, moreButton.height)
+                            FieldMenu {
+                                id: noteMenu
+                                FieldMenuItem { text: "Export note…"; onTriggered: exportDialog.open() }
+                                FieldMenuItem { text: "Copy with timestamps"; enabled: !!window.c.body; onTriggered: window.c.copy(true) }
+                                FieldMenuItem { text: "Retry unfinished audio"; enabled: window.c.failed > 0 || window.c.engineStatus === "error"; onTriggered: window.c.retry() }
+                                FieldMenuItem { text: "Settings…"; onTriggered: filterDialog.open() }
+                                FieldMenuGap { }
+                                FieldMenuItem { text: window.c.trashed ? "Restore note" : "Move note to trash"; enabled: window.c.editable || window.c.trashed; onTriggered: window.c.trashed ? window.c.restoreNote() : window.c.deleteNote() }
+                            }
+                        }
+                    }
+                    NoteEditor {
+                        id: noteEditor
+                        Layout.fillWidth: true; Layout.fillHeight: true; Layout.minimumHeight: 190
+                        readOnly: !window.c.editable
+                        allowFocusMode: true; focusedWriting: window.focusedWriting
+                        statusText: !window.c.selectedId ? "" : window.c.trashed ? "in trash" : window.c.saving ? "saving" : window.c.pending ? "transcribing " + window.c.pending : "saved"
+                        statusColour: window.c.selectedId && !window.c.trashed && !window.c.saving && window.c.pending ? T.p.amber : "transparent"
+                        onFocusModeRequested: window.focusedWriting = !window.focusedWriting
+                        placeholderText: !window.c.selectedId ? "" : window.c.noteStatus === "recording" || window.c.noteStatus === "paused" ? "listening" : window.c.pending ? "transcribing" : ""
+                        onEdited: value => window.c.updateBody(value)
+                        leftInset: mainPane.leftInset; rightInset: mainPane.rightInset
+                        readonly property string message: window.c.error || (window.c.engineStatus === "error" ? window.c.engineError || "transcription failed" : window.notice || (window.c.pending && !window.c.recording ? "finishing transcription" : ""))
+                        readonly property bool failing: !!window.c.error || window.c.engineStatus === "error"
+                        footerColour: T.p.cell
+                        footerItems: [
+                            Rectangle { visible: !!noteEditor.message; Layout.preferredWidth: 6; Layout.preferredHeight: 6; color: noteEditor.failing ? T.p.magenta : window.notice ? T.p.ink : T.p.amber },
                             Text {
                                 Layout.fillWidth: true
-                                text: (noteDelegate.modelData.collection || "Unfiled") + " · " + (noteDelegate.modelData.errors ? "Needs retry" : noteDelegate.modelData.status === "recording" ? "Recording" : noteDelegate.modelData.status === "paused" ? "Paused" : noteDelegate.modelData.pending ? "Transcribing" : Qt.formatDateTime(new Date(noteDelegate.modelData.created * 1000), "dd MMM, HH:mm"))
-                                font.pixelSize: 10; color: noteDelegate.modelData.errors ? "#a73a29" : "#6c7b65"; elide: Text.ElideRight
-                            }
-                        }
+                                text: T.lower(noteEditor.message)
+                                color: noteEditor.failing ? T.p.ink : T.p.muted; font.family: T.mono; font.pixelSize: T.value; elide: Text.ElideRight
+                                ToolTip.visible: statusHover.hovered && truncated; ToolTip.text: text
+                                HoverHandler { id: statusHover }
+                            },
+                            ActionButton { text: "Undo"; implicitHeight: 22; quiet: true; visible: !!window.notice && window.undoVisible; onClicked: { window.c.undoDelete(); window.notice = "" } },
+                            ActionButton { text: "Retry"; implicitHeight: 22; quiet: true; visible: window.c.engineStatus === "error"; onClicked: window.c.retry() },
+                            ActionButton { text: "Dismiss"; implicitHeight: 22; quiet: true; visible: !!window.c.error; onClicked: window.c.dismissError() }
+                        ]
                     }
-                    footer: ActionButton { width: noteList.width; text: "Load more notes"; visible: noteList.count < window.c.total; height: visible ? 32 : 0; onClicked: window.c.loadMore() }
-                    Text { anchors.centerIn: parent; width: parent.width - 16; horizontalAlignment: Text.AlignHCenter; wrapMode: Text.WordWrap; text: searchField.text ? "No matching notes." : window.trash ? "Trash is empty." : "No notes here yet.\nRecord a session or add a note."; color: "#74806c"; font.pixelSize: 12; visible: !noteList.count }
-                    MouseArea { anchors.fill: parent; enabled: !noteList.count; acceptedButtons: Qt.RightButton; onPressed: mouse => workspaceMenu.popup(noteList, mouse.x, mouse.y) }
                 }
-                RowLayout {
-                    Layout.fillWidth: true
-                    ActionButton {
-                        id: trashButton
-                        text: "Trash"; glyph: "trash"; quiet: !window.trash; implicitHeight: 28
-                        onClicked: { window.trash = !window.trash; window.chosenCategory = "*" }
-                        ToolTip.visible: hovered; ToolTip.text: "Drag a note here to move it to Trash. Notes can be restored."
-                        background: Rectangle { radius: 7; color: trashDrop.containsDrag ? "#d4e3cb" : trashButton.down ? "#d9ddd0" : trashButton.hovered ? "#e6e8de" : window.trash ? "#f8faf6" : "transparent"; border.width: trashDrop.containsDrag || trashButton.activeFocus ? 1 : 0; border.color: "#55784c" }
-                        DropArea {
-                            id: trashDrop
-                            anchors.fill: parent; keys: ["fieldnotes-note"]
-                            onEntered: drag => { drag.accepted = drag.source === noteDragGhost && !!noteDragGhost.noteId }
-                            onDropped: drop => {
-                                if (drop.source === noteDragGhost && noteDragGhost.noteId) { window.c.trashNote(noteDragGhost.noteId); drop.accept(Qt.MoveAction) }
-                            }
-                        }
-                    }
-                    Item { Layout.fillWidth: true }
-                    Rectangle { Layout.preferredWidth: 5; Layout.preferredHeight: 5; radius: 3; color: window.c.engineStatus === "ready" ? "#557d46" : window.c.engineStatus === "error" ? "#b44530" : "#b39140" }
-                    Text { text: "Phonon-2"; font.pixelSize: 10; color: "#62735c"; ToolTip.visible: engineHover.hovered; ToolTip.text: window.c.engineStatus === "ready" ? "Local transcription ready" : window.c.engineStatus === "error" ? window.c.engineError : "Preparing the local model"; HoverHandler { id: engineHover } }
                 }
+            }
+            OrganiseView {
+                id: organiser
+                anchors.fill: parent; visible: window.organising
+                controller: window.c; workspace: window.chosenWorkspace
+                notice: window.notice
+                onWorkspaceChosen: id => window.chosenWorkspace = id
+                onBackRequested: window.organising = false
+                onSearchChanged: if (window.organising) window.refreshQuery()
+                onMoveRequested: ids => window.openMove(ids, window.chosenWorkspace)
+                onCreateCategoryRequested: window.create("category")
             }
         }
-        Rectangle { Layout.fillHeight: true; Layout.preferredWidth: 1; color: "#dce2d6" }
-        ColumnLayout {
-            id: mainPane
-            Layout.fillWidth: true; Layout.fillHeight: true
-            Layout.margins: window.width < 1000 ? 16 : 24
-            Layout.topMargin: 12; Layout.bottomMargin: 16
-            spacing: window.height < 760 ? 12 : 16
-            ColumnLayout {
-                Layout.fillWidth: true; spacing: 6
-                RowLayout {
-                    Layout.fillWidth: true; spacing: 10
-                    TextField {
-                        id: titleField
-                        Layout.fillWidth: true; implicitHeight: 34
-                        readOnly: window.c.trashed || !window.c.selectedId
-                        placeholderText: window.c.selectedId ? "Untitled note" : "Select a note"
-                        font.pixelSize: 24; font.weight: Font.DemiBold
-                        color: "#123b2b"; placeholderTextColor: "#6a7c70"; padding: 0; selectByMouse: true
-                        Accessible.name: "Note title"
-                        TextContextMenu { field: titleField }
-                        onTextEdited: if (!window.syncing) window.c.updateTitle(text)
-                        background: Rectangle { color: "transparent"; border.width: titleField.activeFocus ? 1 : 0; border.color: "#8da67d"; radius: 3 }
-                    }
-                    CopyButton { id: copyButton; implicitHeight: 32; enabled: !!window.c.body; reduceMotion: window.reducedMotion; onClicked: window.c.copy(); ToolTip.visible: hovered; ToolTip.text: "Copy without timestamps · ⌘⇧C" }
-                    ActionButton { text: "Export"; glyph: "export"; implicitHeight: 32; enabled: !!window.c.selectedId; onClicked: exportDialog.open() }
-                    ActionButton {
-                        id: moreButton
-                        text: "…"; implicitHeight: 28; implicitWidth: 28; padding: 4; quiet: true
-                        enabled: !!window.c.selectedId; Accessible.name: "More note actions"
-                        onClicked: noteMenu.popup(moreButton.width - noteMenu.width, moreButton.height + 4)
-                        FieldMenu {
-                            id: noteMenu
-                            FieldMenuItem { text: "Copy with timestamps"; enabled: !!window.c.body; onTriggered: window.c.copy(true) }
-                            FieldMenuItem { text: "Retry unfinished audio"; enabled: window.c.failed > 0 || window.c.engineStatus === "error"; onTriggered: window.c.retry() }
-                            FieldMenuItem { text: "Voice filter…"; onTriggered: filterDialog.open() }
-                            MenuSeparator { padding: 4; contentItem: Rectangle { implicitHeight: 1; color: "#dce2d4" } }
-                            FieldMenuItem { text: window.c.trashed ? "Restore note" : "Move note to trash"; enabled: window.c.editable || window.c.trashed; onTriggered: window.c.trashed ? window.c.restoreNote() : window.c.deleteNote() }
-                        }
-                    }
-                }
-                RowLayout {
-                    Layout.fillWidth: true; spacing: 8
-                    FieldCombo {
-                        Layout.preferredWidth: Math.min(160, mainPane.width / 3); glyph: window.width < 1000 ? "" : "folder"; implicitHeight: 28
-                        enabled: !!window.c.selectedId && !window.c.trashed
-                        model: window.c.workspaces; textRole: "name"
-                        currentIndex: Math.max(0, window.c.workspaces.findIndex(n => n.id === window.c.workspace))
-                        Accessible.name: "Note workspace"
-                        onActivated: window.c.updateWorkspace(model[currentIndex].id)
-                    }
-                    FieldCombo {
-                        Layout.preferredWidth: Math.min(160, mainPane.width / 3); glyph: window.width < 1000 ? "" : /hci|test/i.test(window.c.collection) ? "flask" : "folder"; implicitHeight: 28
-                        enabled: !!window.c.selectedId && !window.c.trashed
-                        model: window.noteCategories; textRole: "name"
-                        currentIndex: Math.max(0, window.noteCategories.findIndex(n => n.value === window.c.collection))
-                        Accessible.name: "Note category"
-                        onActivated: window.c.updateCollection(model[currentIndex].value)
-                    }
-                    Item { Layout.fillWidth: true }
-                    Rectangle { implicitWidth: 5; implicitHeight: 5; radius: 3; visible: !!window.c.selectedId; color: window.c.failed ? "#b44530" : "#669276" }
-                    Text {
-                        text: !window.c.selectedId ? "" : window.c.trashed ? "In Trash" : window.c.saving ? "Saving…" : window.c.pending ? "Transcribing · " + window.c.pending : "Saved"
-                        color: "#65796c"; font.pixelSize: 10
-                        ToolTip.visible: saveHover.hovered && window.c.updated > 0
-                        ToolTip.text: "Edited " + Qt.formatDateTime(new Date(window.c.updated * 1000), "dd MMM, HH:mm")
-                        HoverHandler { id: saveHover }
-                    }
-                }
+
+        Rectangle {
+            Layout.fillWidth: true; Layout.preferredHeight: 40
+            visible: window.focusedWriting && window.c.recording
+            color: T.p.band
+            RowLayout {
+                anchors.fill: parent; anchors.leftMargin: 24; anchors.rightMargin: 24; spacing: 12
+                Rectangle { Layout.preferredWidth: 8; Layout.preferredHeight: 8; color: T.p.record; opacity: window.c.paused ? .45 : 1 }
+                Text { text: window.c.clock(window.c.seconds); color: T.p.bandInk; font.family: T.mono; font.pixelSize: T.value }
+                Text { Layout.fillWidth: true; text: window.c.paused ? "paused" : "recording"; color: T.p.bandMuted; font.family: T.mono; font.pixelSize: T.value }
+                ActionButton { onBand: true; text: window.c.paused ? "Resume" : "Pause"; keys: "⌘⇧P"; enabled: !window.c.stopping; onClicked: window.c.pause() }
+                ActionButton { onBand: true; text: window.c.stopping ? "Stopping" : "Stop"; keys: "⌘R"; enabled: !window.c.stopping; onClicked: window.c.stop() }
             }
-            Surface {
-                Layout.fillWidth: true; Layout.fillHeight: true; Layout.minimumHeight: 146
-                ColumnLayout {
-                    anchors.fill: parent; anchors.margins: 20; spacing: 12
-                    RowLayout {
-                        Layout.fillWidth: true; spacing: 6
-                        FieldIcon { name: "document"; Layout.preferredWidth: 20; Layout.preferredHeight: 20; tint: "#8e9e90" }
-                        Text { text: "TRANSCRIPT"; font.pixelSize: 10; font.letterSpacing: 1.6; font.weight: Font.DemiBold; color: "#61776a" }
-                        Item { Layout.fillWidth: true }
-                        TextField {
-                            id: transcriptSearch
-                            Layout.preferredWidth: Math.min(220, mainPane.width / 3); implicitHeight: 30
-                            placeholderText: "Find in transcript"; color: "#293d2b"; placeholderTextColor: "#768377"; font.pixelSize: 11; selectByMouse: true; leftPadding: 30
-                            FieldIcon { name: "search"; width: 15; height: 15; x: 9; anchors.verticalCenter: parent.verticalCenter; tint: "#7a8d7d" }
-                            Accessible.name: "Search transcript"
-                            TextContextMenu { field: transcriptSearch }
-                            onAccepted: window.findTranscript(false)
-                            onTextEdited: { window.findPosition = -1; window.findTranscript(false) }
-                            background: Rectangle { color: "#f8faf6"; radius: 5; border.color: transcriptSearch.activeFocus ? "#64815a" : "#e0e7dd" }
-                        }
-                        ActionButton { text: "↑"; padding: 4; implicitWidth: 28; implicitHeight: 28; quiet: true; enabled: !!transcriptSearch.text; Accessible.name: "Previous transcript match"; onClicked: window.findTranscript(true) }
-                        ActionButton { text: "↓"; padding: 4; implicitWidth: 28; implicitHeight: 28; quiet: true; enabled: !!transcriptSearch.text; Accessible.name: "Next transcript match"; onClicked: window.findTranscript(false) }
-                    }
-                    Item {
-                        Layout.fillWidth: true; Layout.fillHeight: true
-                        Flickable {
-                            id: transcriptView
-                            anchors.fill: parent; clip: true
-                            contentWidth: width; contentHeight: editor.height
-                            boundsBehavior: Flickable.StopAtBounds; boundsMovement: Flickable.StopAtBounds
-                            flickDeceleration: 5000; maximumFlickVelocity: 1400; acceptedButtons: Qt.NoButton
-                            ScrollBar.vertical: ScrollBar { }
-                            TextArea {
-                                id: editor
-                                width: transcriptView.width
-                                height: Math.max(transcriptView.height, implicitHeight)
-                                textFormat: TextEdit.PlainText; wrapMode: TextEdit.Wrap; selectByMouse: true
-                                readOnly: !window.c.editable; persistentSelection: true
-                                font.pixelSize: 14; color: "#47574d"; selectionColor: "#cddfba"; selectedTextColor: "#20331c"
-                                leftPadding: 0; rightPadding: 14; topPadding: 2; bottomPadding: 18
-                                placeholderTextColor: "#768377"
-                                placeholderText: !window.c.selectedId ? "Select a note or start recording."
-                                    : window.c.noteStatus === "recording" || window.c.noteStatus === "paused" ? "Waiting for the first transcribed section…"
-                                    : window.c.pending ? "Transcribing…" : "Write a note…"
-                                Accessible.name: "Note transcript"
-                                TextContextMenu { field: editor }
-                                onTextChanged: if (!window.syncing && window.c.editable) window.c.updateBody(text)
-                                onCursorRectangleChanged: window.revealCursor()
-                                background: Rectangle { color: "transparent" }
-                            }
-                        }
-                        // Fixed overlays mark the viewport edges without scrolling
-                        // with the document or taking space from the transcript.
-                        Rectangle { anchors.left: parent.left; anchors.right: parent.right; anchors.top: parent.top; height: 1; color: "#e5ebe2" }
-                        Rectangle { anchors.left: parent.left; anchors.right: parent.right; anchors.bottom: parent.bottom; height: 1; color: "#e5ebe2" }
-                    }
-                    Text { Layout.fillWidth: true; Layout.preferredHeight: 14; opacity: transcriptSearch.text ? 1 : 0; text: window.findPosition < 0 ? "No matches" : "Match highlighted"; color: "#6a7c70"; font.pixelSize: 10 }
-                }
-            }
-            RecordingConsole {
-                Layout.fillWidth: true; Layout.preferredHeight: implicitHeight
-                Layout.minimumHeight: implicitHeight; Layout.maximumHeight: implicitHeight
-                controller: window.c; compact: window.height < 760
-                reduceMotion: window.reducedMotion; motionActive: window.active && window.visibility !== Window.Minimized
-                voiceDb: preferences.voiceDb; deviceId: window.deviceId
-                destinationWorkspace: window.c.recording ? window.c.capture.workspace || window.recordingWorkspace : window.recordingWorkspace
-                destinationCategory: window.c.recording ? window.c.capture.collection || "" : window.recordingCategory
-                onDestinationChosen: workspace => window.chooseRecordingWorkspace(workspace)
-                onDestinationCategoryChosen: category => window.recordingCategory = category
-                destination: window.workspaceName(window.c.recording ? window.c.capture.workspace : window.recordingWorkspace) + " / " + (window.c.recording ? window.c.capture.collection || "Unfiled" : window.recordingCategory || "Unfiled")
-                onRecordRequested: window.recordToggle()
-                onPauseRequested: window.c.pause()
-                onDeviceChosen: device => window.deviceId = device
-                onFilterRequested: filterDialog.open()
-            }
-            Item {
-                Layout.fillWidth: true; Layout.preferredHeight: 0; Layout.maximumHeight: 0
-                RowLayout {
-                width: parent.width; height: 20; y: -8; spacing: 6
-                Text {
-                    Layout.fillWidth: true
-                    text: window.c.error || (window.c.engineStatus === "error" ? "Transcription failed. Audio retained for retry. " + window.c.engineError : window.notice || (window.c.pending && !window.c.recording ? "Finishing transcription…" : ""))
-                    color: window.c.error || window.c.engineStatus === "error" ? "#a33d28" : "#6e7d5e"; font.pixelSize: 11; elide: Text.ElideRight
-                    ToolTip.visible: statusHover.hovered && !!text; ToolTip.text: text
-                    HoverHandler { id: statusHover }
-                }
-                ActionButton { text: "Undo"; implicitHeight: 20; font.pixelSize: 11; quiet: true; visible: !!window.notice && window.undoVisible; onClicked: { window.c.undoDelete(); window.notice = "" } }
-                ActionButton { text: "Retry"; implicitHeight: 20; font.pixelSize: 11; quiet: true; visible: window.c.engineStatus === "error"; onClicked: window.c.retry() }
-                ActionButton { text: "Dismiss"; implicitHeight: 20; font.pixelSize: 11; quiet: true; visible: !!window.c.error; onClicked: window.c.dismissError() }
-                }
-            }
+        }
+        RecordingConsole {
+            visible: !window.focusedWriting
+            // The band's first column spans the rail's content and its keys start on the
+            // document's text edge: 6 gutter + 18 inset on the left, rail 290 wide.
+            leadWidth: 290 - 36; leadGap: 18 + 6 + 18
+            Layout.fillWidth: true; Layout.preferredHeight: implicitHeight
+            controller: window.c; compact: window.height < 760
+            reduceMotion: window.reducedMotion; motionActive: window.active && window.visibility !== Window.Minimized
+            voiceDb: preferences.voiceDb; deviceId: window.deviceId
+            destinationWorkspace: window.c.recording ? window.c.capture.workspace || window.recordingWorkspace : window.recordingWorkspace
+            destinationCategory: window.c.recording ? window.c.capture.collection || "" : window.recordingCategory
+            onDestinationChosen: workspace => window.chooseRecordingWorkspace(workspace)
+            onDestinationCategoryChosen: category => window.recordingCategory = category
+            destination: window.workspaceName(window.c.recording ? window.c.capture.workspace : window.recordingWorkspace) + " / " + (window.c.recording ? window.c.capture.collection || "unfiled" : window.recordingCategory || "unfiled")
+            onRecordRequested: window.recordToggle()
+            onPauseRequested: window.c.pause()
+            onDeviceChosen: device => window.deviceId = device
+            onVoiceDbChosen: value => preferences.voiceDb = value
+            onFilterRequested: filterDialog.open()
         }
     }
 }

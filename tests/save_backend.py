@@ -37,6 +37,11 @@ for line in sys.stdin:
         time.sleep(float(os.environ.get("FIELDNOTES_TEST_ACK_DELAY", "0")))
         emit({"event": "saved", "id": command["id"], "fields": fields})
         state()
+    elif command["action"] == "move":
+        for note_id in command["ids"]:
+            notes[note_id]["collection"] = command["collection"]
+        emit({"event": "moved", "count": len(command["ids"]), "collection": command["collection"]})
+        state()
     elif command["action"] == "select":
         selected = command["id"]
         state()

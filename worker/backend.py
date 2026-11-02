@@ -243,6 +243,9 @@ class Backend:
                 raise RuntimeError("Finish transcription before editing this note")
             self.store.update(note_id, **fields)
             self.emit({"event": "saved", "id": note_id, "fields": fields})
+        elif action == "move":
+            count = self.store.move_notes(command.get("ids"), command["workspace"], command["collection"])
+            self.emit({"event": "moved", "count": count, "collection": command["collection"]})
         elif action in ("delete", "restore"):
             if action == "delete" and (note_id == self.recorder.note_id or self.store.counts(note_id).get("processing")):
                 raise RuntimeError("Stop recording and finish transcription before deleting this note")
@@ -253,7 +256,7 @@ class Backend:
             self.selected = note_id
         elif action == "query":
             query = {"workspace": command.get("workspace", "inbox"), "collection": command.get("collection"),
-                     "search": command.get("search", ""), "trash": command.get("trash", False), "limit": 100}
+                     "search": command.get("search", ""), "trash": command.get("trash", False), "limit": -1 if command.get("all") else 100}
             if any(query[key] != self.query[key] for key in ("workspace", "collection", "trash")):
                 rows, _ = self.store.browse(**query)
                 self.selected = rows[0]["id"] if rows else ""
@@ -267,6 +270,14 @@ class Backend:
         elif action == "category":
             self.store.create_category(command["workspace"], command["name"])
             self.emit({"event": "category", "name": command["name"].strip()})
+        elif action == "rename_category":
+            self.store.rename_category(command["workspace"], command["name"], command["replacement"])
+            self.emit({"event": "category_changed", "message": "Category renamed"})
+        elif action == "remove_category":
+            self.store.remove_category(command["workspace"], command["name"])
+            self.emit({"event": "category_changed", "message": "Category removed. Its notes are now Unfiled."})
+        elif action == "reorder_categories":
+            self.store.reorder_categories(command["workspace"], command["names"])
         elif action == "retry":
             self.store.retry(note_id)
             self.retry_engine.set()

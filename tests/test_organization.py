@@ -29,6 +29,19 @@ class OrganizationTests(unittest.TestCase):
         self.store.update(note, body='New wording.')
         self.assertEqual(self.store.note(note)['title'], 'Participant 7')
 
+    def test_markdown_heading_titles_preserve_source_and_manual_names(self):
+        note = self.store.create()
+        body = '## Typed note\n\nA new **idea** worth keeping.\n\n- First action\n- Second action'
+        self.store.update(note, body=body)
+        self.assertEqual(self.store.note(note)['title'], 'Typed note')
+        self.assertEqual(self.store.note(note)['body'], body)
+        self.store.update(note, body='# Revised heading ###\n\nMore text.')
+        self.assertEqual(self.store.note(note)['title'], 'Revised heading')
+        self.store.update(note, title='My own title')
+        self.store.update(note, body=body)
+        self.assertEqual(self.store.note(note)['title'], 'My own title')
+        self.assertEqual(self.store.note(note)['body'], body)
+
     def test_empty_categories_and_workspaces_persist_and_notes_can_move(self):
         workspace = self.store.create_workspace('HCI tests')
         self.store.create_category(workspace, 'Participant sessions')
@@ -44,6 +57,77 @@ class OrganizationTests(unittest.TestCase):
         self.store.update(note, deleted=1)
         self.assertEqual(self.store.browse(workspace=workspace)[1], 0)
         self.assertEqual(self.store.browse(workspace=workspace, trash=True)[1], 1)
+
+    def test_bulk_move_is_atomic_and_preserves_content_and_capture(self):
+        first = self.store.create(collection='Source')
+        second = self.store.create('Manual title', collection='Source')
+        self.store.update(first, body='Captured thought.', status='recording')
+        self.store.update(second, body='Edited transcript.')
+        self.store.create_category('inbox', 'Destination')
+        originals = [self.store.note(n) for n in (first, second)]
+        self.assertEqual(self.store.move_notes([first, second, first], 'inbox', 'Destination'), 2)
+        self.store.close(); self.store = Store(self.path)
+        for before in originals:
+            after = self.store.note(before['id'])
+            self.assertEqual(after['collection'], 'Destination')
+            for key in ('body', 'title', 'status', 'workspace', 'created', 'auto_title'):
+                self.assertEqual(after[key], before[key])
+        self.assertEqual(self.store.browse(collection='Source')[1], 0)
+        self.assertEqual(self.store.browse(collection='Destination')[1], 2)
+        for invalid in ('missing', second):
+            if invalid == second:
+                self.store.update(second, deleted=1)
+            with self.assertRaises(ValueError):
+                self.store.move_notes([first, invalid], 'inbox', '')
+            self.assertEqual(self.store.note(first)['collection'], 'Destination')
+        with self.assertRaises(ValueError):
+            self.store.move_notes([first], 'inbox', 'Not a category')
+        other = self.store.create_workspace('Other')
+        with self.assertRaises(ValueError):
+            self.store.move_notes([first], other, '')
+        self.store.move_notes([first], 'inbox', '')
+        self.assertEqual(self.store.note(first)['collection'], '')
+
+    def test_category_management_preserves_live_and_trashed_notes(self):
+        live = self.store.create(collection='Drafts')
+        trashed = self.store.create(collection='Drafts')
+        self.store.update(trashed, deleted=1)
+        self.store.create_category('inbox', 'Ideas')
+        self.store.rename_category('inbox', 'Drafts', 'Fieldwork')
+        for note in (live, trashed):
+            self.assertEqual(self.store.note(note)['collection'], 'Fieldwork')
+        with self.assertRaisesRegex(ValueError, 'already exists'):
+            self.store.rename_category('inbox', 'Fieldwork', 'Ideas')
+        self.assertEqual(self.store.note(live)['collection'], 'Fieldwork')
+        self.store.reorder_categories('inbox', ['Ideas', 'Fieldwork'])
+        self.store.close(); self.store = Store(self.path)
+        self.assertEqual([c['name'] for c in self.store.catalog()[1]], ['Ideas', 'Fieldwork'])
+        with self.assertRaises(ValueError):
+            self.store.reorder_categories('inbox', ['Ideas', 'Ideas'])
+        self.store.remove_category('inbox', 'Fieldwork')
+        for note in (live, trashed):
+            self.assertEqual(self.store.note(note)['collection'], '')
+        self.assertTrue(self.store.note(trashed)['deleted'])
+        self.assertFalse(self.store.note(live)['deleted'])
+        self.assertEqual(len(self.store.notes(include_deleted=True)), 2)
+
+    def test_organise_query_includes_every_note_and_bulk_move_keeps_open_document(self):
+        from backend import Backend
+        events = []
+        backend = Backend(Path(self.temp.name) / 'organise.db', emit=events.append, fake_engine=True)
+        try:
+            ids = [backend.store.create(f'Note {i}', collection='Source') for i in range(115)]
+            backend.store.create_category('inbox', 'Destination')
+            backend.selected = ids[0]
+            backend.command({'action': 'query', 'workspace': 'inbox', 'all': True})
+            state = [e for e in events if e['event'] == 'state'][-1]
+            self.assertEqual(len(state['notes']), 115)
+            backend.command({'action': 'move', 'ids': ids[1:], 'workspace': 'inbox', 'collection': 'Destination'})
+            self.assertEqual(backend.selected, ids[0])
+            self.assertEqual(backend.store.browse(collection='Destination')[1], 114)
+            self.assertIn({'event': 'moved', 'count': 114, 'collection': 'Destination'}, events)
+        finally:
+            backend.shutdown()
 
     def test_database_search_pages_metadata_without_loading_transcripts(self):
         for i in range(115):

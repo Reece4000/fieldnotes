@@ -8,4 +8,9 @@ cmake --build build -j 8
 "$qt_prefix/bin/qmllint" qml/*.qml
 "$qt_prefix/bin/macdeployqt" build/Fieldnotes.app -qmldir="$task_root/qml" -libpath="$qt_prefix/lib" -always-overwrite -no-codesign
 codesign --force --deep --sign - build/Fieldnotes.app
+codesign --verify --deep --strict build/Fieldnotes.app
+python3 scripts/check_app.py build/Fieldnotes.app
+# Refresh Finder and Launch Services after changing an existing app bundle.
+touch build/Fieldnotes.app
+/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f "$task_root/build/Fieldnotes.app"
 printf 'Built: %s/build/Fieldnotes.app\n' "$task_root"

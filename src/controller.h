@@ -11,6 +11,7 @@
 class Controller : public QObject {
     Q_OBJECT
     Q_PROPERTY(QAbstractItemModel* notes READ notes CONSTANT)
+    Q_PROPERTY(QVariantList noteRows READ noteRows NOTIFY notesChanged)
     Q_PROPERTY(QVariantList workspaces READ workspaces NOTIFY notesChanged)
     Q_PROPERTY(QVariantList categories READ categories NOTIFY notesChanged)
     Q_PROPERTY(int total READ total NOTIFY notesChanged)
@@ -23,6 +24,8 @@ class Controller : public QObject {
     Q_PROPERTY(QUrl settingsFile READ settingsFile CONSTANT)
     Q_PROPERTY(QVariantList devices READ devices NOTIFY devicesChanged)
     Q_PROPERTY(QString selectedId READ selectedId NOTIFY documentChanged)
+    Q_PROPERTY(QStringList selectedNoteIds READ selectedNoteIds NOTIFY noteSelectionChanged)
+    Q_PROPERTY(bool moving READ moving NOTIFY stateChanged)
     Q_PROPERTY(QString title READ title NOTIFY documentChanged)
     Q_PROPERTY(QString body READ body NOTIFY documentChanged)
     Q_PROPERTY(QString collection READ collection NOTIFY documentChanged)
@@ -46,6 +49,7 @@ public:
     ~Controller() override;
     void start();
     QAbstractItemModel *notes() { return &m_noteModel; }
+    QVariantList noteRows() const { return m_notes; }
     QVariantList workspaces() const { return m_workspaces; }
     QVariantList categories() const { return m_categories; }
     int total() const { return m_total; }
@@ -58,6 +62,8 @@ public:
     QUrl settingsFile() const;
     QVariantList devices() const { return m_devices; }
     QString selectedId() const { return m_selected; }
+    QStringList selectedNoteIds() const { return m_selectedNoteIds; }
+    bool moving() const { return m_moving; }
     QString title() const { return m_document.value("title").toString(); }
     QString body() const { return m_document.value("body").toString(); }
     QString collection() const { return m_document.value("collection").toString(); }
@@ -77,12 +83,20 @@ public:
     double seconds() const { return m_seconds; }
     double level() const { return m_level; }
     Q_INVOKABLE void selectNote(const QString &id);
+    Q_INVOKABLE void selectNoteRow(const QString &id, bool toggle = false, bool extend = false);
+    Q_INVOKABLE void selectAllNotes();
+    Q_INVOKABLE void selectNotes(const QStringList &ids);
+    Q_INVOKABLE void clearNoteSelection();
+    Q_INVOKABLE void moveNotes(const QStringList &ids, const QString &workspace, const QString &collection);
     Q_INVOKABLE void newNote(const QString &collection = "", const QString &workspace = "inbox");
     Q_INVOKABLE void record(int device = -1, const QString &collection = "", const QString &workspace = "inbox", double voiceDb = -72);
-    Q_INVOKABLE void query(const QString &workspace, const QString &collection, const QString &search, bool trash = false);
+    Q_INVOKABLE void query(const QString &workspace, const QString &collection, const QString &search, bool trash = false, bool all = false);
     Q_INVOKABLE void loadMore();
     Q_INVOKABLE void createWorkspace(const QString &name);
     Q_INVOKABLE void createCategory(const QString &workspace, const QString &name);
+    Q_INVOKABLE void renameCategory(const QString &workspace, const QString &name, const QString &replacement);
+    Q_INVOKABLE void removeCategory(const QString &workspace, const QString &name);
+    Q_INVOKABLE void reorderCategories(const QString &workspace, const QStringList &names);
     Q_INVOKABLE void updateWorkspace(const QString &value);
     Q_INVOKABLE void stop();
     Q_INVOKABLE void pause();
@@ -103,6 +117,8 @@ public:
     Q_INVOKABLE QString clock(double value) const;
 signals:
     void notesChanged();
+    void noteSelectionChanged();
+    void notesMoved(int count, const QString &collection);
     void devicesChanged();
     void documentChanged();
     void stateChanged();
@@ -114,6 +130,7 @@ signals:
     void deleted();
     void workspaceCreated(const QString &id);
     void categoryCreated(const QString &name);
+    void categoryChanged(const QString &message);
 private:
     void send(QJsonObject value);
     void receive();
@@ -128,6 +145,9 @@ private:
     QFile m_log;
     QByteArray m_buffer;
     QVariantList m_notes, m_devices, m_workspaces, m_categories, m_waveform;
+    QStringList m_selectedNoteIds;
+    QString m_selectionAnchor;
+    bool m_moving = false;
     int m_total = 0, m_deletionIndex = 0;
     QVariantMap m_document, m_capture;
     QHash<QString, QVariantMap> m_edits;

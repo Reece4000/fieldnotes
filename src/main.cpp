@@ -18,7 +18,6 @@ int main(int argc, char *argv[]) {
     app.setApplicationName("Fieldnotes");
     app.setOrganizationName("Fieldnotes");
     app.setApplicationVersion("0.3.0");
-    app.styleHints()->setColorScheme(Qt::ColorScheme::Light);
     QQuickStyle::setStyle("Basic");
     QString data = qEnvironmentVariable("FIELDNOTES_DATA_DIR");
     if (data.isEmpty()) data = QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation) + "/Fieldnotes";

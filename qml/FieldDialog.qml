@@ -1,14 +1,20 @@
 import QtQuick
 import QtQuick.Controls
+import "Theme.js" as T
+
 Dialog {
     id: control
     modal: true
-    padding: 22
-    topPadding: 12
-    background: Rectangle { color: "#fafcf8"; radius: 12; border.color: "#cbd5c9" }
+    padding: 24
+    topPadding: 4
+    background: Rectangle { color: T.p.panel }
     header: Item {
-        implicitHeight: 56
-        Text { anchors.left: parent.left; anchors.right: parent.right; anchors.leftMargin: 22; anchors.rightMargin: 22; anchors.verticalCenter: parent.verticalCenter; text: control.title; color: "#213c32"; font.pixelSize: 18; font.weight: Font.DemiBold }
+        implicitHeight: 64
+        Text {
+            anchors.left: parent.left; anchors.right: parent.right; anchors.leftMargin: 24; anchors.rightMargin: 24
+            anchors.verticalCenter: parent.verticalCenter
+            text: T.lower(control.title); color: T.p.ink; font.family: T.sans; font.pixelSize: 22; elide: Text.ElideRight
+        }
     }
-    Overlay.modal: Rectangle { color: "#660f241c" }
+    Overlay.modal: Rectangle { color: T.alpha(T.p.ground, .72) }
 }

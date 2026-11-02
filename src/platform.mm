@@ -29,7 +29,6 @@ bool fieldnotesSystemReduceMotion() {
 void fieldnotesStyleWindow(QWindow *window) {
     NSView *view = (__bridge NSView *)(void *)window->winId();
     NSWindow *nativeWindow = view.window;
-    nativeWindow.appearance = [NSAppearance appearanceNamed:NSAppearanceNameAqua];
     nativeWindow.titleVisibility = NSWindowTitleHidden;
     nativeWindow.titlebarAppearsTransparent = YES;
     const CGFloat controlsWidth = 80;
@@ -40,5 +39,7 @@ void fieldnotesStyleWindow(QWindow *window) {
     dragView.autoresizingMask = NSViewWidthSizable | (view.isFlipped ? NSViewMaxYMargin : NSViewMinYMargin);
     [view addSubview:dragView];
     [dragView release];
-    nativeWindow.backgroundColor = [NSColor colorWithRed:0.951 green:0.969 blue:0.941 alpha:1];
+    // The appearance follows the theme (QML sets the colour scheme); the window
+    // background follows the appearance, so a resize never flashes the wrong tone.
+    nativeWindow.backgroundColor = NSColor.windowBackgroundColor;
 }

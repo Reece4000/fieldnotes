@@ -74,5 +74,20 @@ Item {
             checkbox.toggle()
             compare(backend.selectedNoteIds.length, 0)
         }
+        function test_listKeepsScrollWhenNotesRefresh() {
+            const saved = backend.noteRows
+            const many = []
+            for (let i = 0; i < 40; i++) many.push({id: "n" + i, workspace: "inbox", collection: "", title: "Note " + i, preview: "", updated: 100 - i, created: i})
+            backend.noteRows = many
+            const list = findChild(organiser, "organisedNotes")
+            list.contentY = list.originY + 300
+            // A save or transcription refreshes the rows: the list stays where it was.
+            backend.noteRows = many.map(n => Object.assign({}, n, n.id === "n3" ? {preview: "edited"} : {}))
+            compare(list.contentY - list.originY, 300)
+            // Changing what the list shows starts it at the top.
+            organiser.sort = 1
+            compare(list.contentY - list.originY, 0)
+            backend.noteRows = saved
+        }
     }
 }

@@ -49,6 +49,8 @@ class Backend:
     def __init__(self, path, emit=None, fake_engine=False):
         self.store = Store(path)
         self.store.recover()
+        # Empty notes left by earlier sessions go too.
+        self.store.discard_empty()
         self.output_lock = threading.RLock()
         self.emit_override = emit
         self.output_wake = threading.Event()
@@ -208,6 +210,12 @@ class Backend:
                 # Explicit retry; never consume endless resources in a crash loop.
                 self.retry_engine.wait()
 
+    def select(self, note_id):
+        """Selects a note, discarding the one left behind if it is still empty."""
+        previous, self.selected = self.selected, note_id
+        if previous and previous != note_id and previous != self.recorder.note_id:
+            self.store.discard_if_empty(previous)
+
     def command(self, command):
         action = command["action"]
         note_id = command.get("id")
@@ -221,12 +229,12 @@ class Backend:
             self.emit({"event": "devices", "devices": self.recorder.devices()})
         elif action == "new":
             note_id = self.store.create("Untitled note", command.get("collection", ""), command.get("workspace", "inbox"))
-            self.selected = note_id
+            self.select(note_id)
             self.emit({"event": "select", "id": note_id})
         elif action == "record":
             note_id = self.store.create(collection=command.get("collection", ""), workspace=command.get("workspace", "inbox"),
                                         voice_db=max(-90, min(-20, command.get("voiceDb", -72))))
-            self.selected = note_id
+            self.select(note_id)
             self.emit({"event": "select", "id": note_id})
             try:
                 self.recorder.start(note_id, command.get("device"))
@@ -247,19 +255,31 @@ class Backend:
             count = self.store.move_notes(command.get("ids"), command["workspace"], command["collection"])
             self.emit({"event": "moved", "count": count, "collection": command["collection"]})
         elif action in ("delete", "restore"):
-            if action == "delete" and (note_id == self.recorder.note_id or self.store.counts(note_id).get("processing")):
+            ids = command.get("ids") or [note_id]
+            if action == "delete" and any(n == self.recorder.note_id or self.store.counts(n).get("processing") for n in ids):
                 raise RuntimeError("Stop recording and finish transcription before deleting this note")
-            self.store.update(note_id, deleted=int(action == "delete"))
+            for n in ids:
+                self.store.update(n, deleted=int(action == "delete"))
             if action == "delete":
-                self.emit({"event": "deleted", "id": note_id})
+                self.emit({"event": "deleted", "id": ids[0], **({"ids": ids} if len(ids) > 1 else {})})
         elif action == "select":
-            self.selected = note_id
+            self.select(note_id)
+        elif action == "discard":
+            # Closing a note (the organise drawer) discards it if it is empty.
+            if note_id != self.recorder.note_id and self.store.discard_if_empty(note_id) and note_id == self.selected:
+                rows, _ = self.store.browse(**self.query)
+                self.selected = rows[0]["id"] if rows else ""
+                self.emit({"event": "select", "id": self.selected})
         elif action == "query":
             query = {"workspace": command.get("workspace", "inbox"), "collection": command.get("collection"),
                      "search": command.get("search", ""), "trash": command.get("trash", False), "limit": -1 if command.get("all") else 100}
-            if any(query[key] != self.query[key] for key in ("workspace", "collection", "trash")):
+            # Keep your place: reopen the note asked for (a page's remembered note), else keep
+            # the open note while it is still listed, else open the first.
+            keep = command.get("select")
+            if keep or any(query[key] != self.query[key] for key in ("workspace", "collection", "trash")):
                 rows, _ = self.store.browse(**query)
-                self.selected = rows[0]["id"] if rows else ""
+                ids = [row["id"] for row in rows]
+                self.select(next((n for n in (keep, self.selected) if n and n in ids), ids[0] if ids else ""))
                 self.emit({"event": "select", "id": self.selected})
             self.query = query
         elif action == "more":
@@ -284,6 +304,8 @@ class Backend:
             self.wake.set()
         elif action == "shutdown":
             self.shutting_down = True
+            if self.selected != self.recorder.note_id:
+                self.store.discard_if_empty(self.selected)
             self.recorder.request_stop()
             if not self.recorder.note_id:
                 self.quit.set()

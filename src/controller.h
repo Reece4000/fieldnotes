@@ -90,7 +90,7 @@ public:
     Q_INVOKABLE void moveNotes(const QStringList &ids, const QString &workspace, const QString &collection);
     Q_INVOKABLE void newNote(const QString &collection = "", const QString &workspace = "inbox");
     Q_INVOKABLE void record(int device = -1, const QString &collection = "", const QString &workspace = "inbox", double voiceDb = -72);
-    Q_INVOKABLE void query(const QString &workspace, const QString &collection, const QString &search, bool trash = false, bool all = false);
+    Q_INVOKABLE void query(const QString &workspace, const QString &collection, const QString &search, bool trash = false, bool all = false, const QString &select = QString());
     Q_INVOKABLE void loadMore();
     Q_INVOKABLE void createWorkspace(const QString &name);
     Q_INVOKABLE void createCategory(const QString &workspace, const QString &name);
@@ -108,8 +108,11 @@ public:
     Q_INVOKABLE void exportNote(const QUrl &url);
     Q_INVOKABLE void deleteNote();
     Q_INVOKABLE void trashNote(const QString &id);
+    Q_INVOKABLE void trashNotes(const QStringList &ids);
     Q_INVOKABLE void undoDelete();
     Q_INVOKABLE void restoreNote(const QString &id = QString());
+    // Closing a note discards it if it is still empty (no title of its own, text or audio).
+    Q_INVOKABLE void discardIfEmpty(const QString &id);
     Q_INVOKABLE void retry(const QString &id = QString());
     Q_INVOKABLE void refreshDevices();
     Q_INVOKABLE void dismissError();
@@ -127,7 +130,7 @@ signals:
     void copied();
     void noteCopied(const QString &id);
     void exported();
-    void deleted();
+    void deleted(int count);
     void workspaceCreated(const QString &id);
     void categoryCreated(const QString &name);
     void categoryChanged(const QString &message);
@@ -153,7 +156,8 @@ private:
     QHash<QString, QVariantMap> m_edits;
     QHash<QString, QVariantMap> m_pendingUpdates;
     QTimer m_editTimer;
-    QString m_selected, m_active, m_engine = "loading", m_engineError, m_error, m_deleted, m_deletionPending, m_selectionPending;
+    QString m_selected, m_active, m_engine = "loading", m_engineError, m_error, m_deletionPending, m_selectionPending;
+    QStringList m_deletedIds;
     bool m_paused = false, m_connected = false, m_closing = false;
     bool m_stopping = false, m_restarting = false;
     double m_seconds = 0, m_level = 0, m_db = -90;

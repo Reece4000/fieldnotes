@@ -9,8 +9,7 @@ var sans = "Geist"
 var mono = "Geist Mono"
 var segment = "DSEG14 Modern"
 
-// Sizes in pixels. Section titles are large and muted; the current one is ink.
-var section = 26
+// Sizes in pixels.
 var label = 14
 var value = 12
 var small = 11

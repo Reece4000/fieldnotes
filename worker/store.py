@@ -93,6 +93,21 @@ class Store:
                              int(title in (None, "Untitled note", "Untitled"))))
         return note_id
 
+    # An empty note: never renamed, no text and no audio. Leaving one discards it outright,
+    # so opening a new note and walking away leaves nothing behind.
+    EMPTY = "auto_title=1 AND trim(body, ' \n\t')='' AND NOT EXISTS (SELECT 1 FROM segments WHERE segments.note_id=notes.id)"
+
+    def discard_if_empty(self, note_id):
+        with self.lock, self.db:
+            return self.db.execute(f"DELETE FROM notes WHERE id=? AND {self.EMPTY}", (note_id,)).rowcount > 0
+
+    def discard_empty(self, keep=()):
+        keep = [n for n in keep if n]
+        with self.lock, self.db:
+            marks = ",".join("?" * len(keep))
+            where = f" AND id NOT IN ({marks})" if keep else ""
+            return self.db.execute(f"DELETE FROM notes WHERE {self.EMPTY}{where}", keep).rowcount
+
     def note(self, note_id):
         with self.lock:
             row = self.db.execute("SELECT * FROM notes WHERE id=?", (note_id,)).fetchone()

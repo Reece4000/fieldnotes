@@ -217,5 +217,68 @@ class OrganizationTests(unittest.TestCase):
         finally:
             backend.shutdown()
 
+    def test_empty_notes_are_discarded_and_kept_notes_are_not(self):
+        empty = self.store.create('Untitled note')
+        typed = self.store.create('Untitled note'); self.store.update(typed, body='Something')
+        named = self.store.create('Untitled note'); self.store.update(named, title='Kept title')
+        heard = self.store.create()
+        segment = self.store.segment(heard, 0, 16000); self.store.append(segment, b'\0\0' * 160, 0.01)
+        blank = self.store.create('Untitled note'); self.store.update(blank, body='  \n ')
+        self.assertTrue(self.store.discard_if_empty(empty))
+        for note in (typed, named, heard):
+            self.assertFalse(self.store.discard_if_empty(note))
+            self.assertIsNotNone(self.store.note(note))
+        self.assertEqual(self.store.discard_empty(keep=[blank]), 0)
+        self.assertEqual(self.store.discard_empty(), 1)
+        self.assertIsNone(self.store.note(blank))
+
+    def test_leaving_an_empty_note_discards_it_and_notes_trash_together(self):
+        from backend import Backend
+        events = []
+        backend = Backend(Path(self.temp.name) / 'leave.sqlite3', emit=events.append, fake_engine=True)
+        try:
+            backend.command({'action': 'new', 'workspace': 'inbox'})
+            first = backend.selected
+            backend.command({'action': 'new', 'workspace': 'inbox'})
+            self.assertIsNone(backend.store.note(first))
+            second = backend.selected
+            backend.command({'action': 'update', 'id': second, 'body': 'Kept'})
+            backend.command({'action': 'new', 'workspace': 'inbox'})
+            self.assertIsNotNone(backend.store.note(second))
+            third = backend.selected
+            backend.command({'action': 'discard', 'id': third})
+            self.assertIsNone(backend.store.note(third))
+            self.assertEqual(backend.selected, second)
+            other = backend.store.create('Another'); backend.store.update(other, body='Also kept')
+            backend.command({'action': 'delete', 'id': second, 'ids': [second, other]})
+            self.assertTrue(all(backend.store.note(n)['deleted'] for n in (second, other)))
+            self.assertIn({'event': 'deleted', 'id': second, 'ids': [second, other]}, events)
+            backend.command({'action': 'restore', 'id': second, 'ids': [second, other]})
+            self.assertFalse(any(backend.store.note(n)['deleted'] for n in (second, other)))
+        finally:
+            backend.shutdown()
+
+    def test_query_keeps_the_open_note_or_reopens_a_remembered_one(self):
+        from backend import Backend
+        events = []
+        backend = Backend(Path(self.temp.name) / 'keep.sqlite3', emit=events.append, fake_engine=True)
+        try:
+            work = backend.store.create('Work note', 'Work'); backend.store.update(work, body='w')
+            home = backend.store.create('Home note', 'Home'); backend.store.update(home, body='h')
+            backend.command({'action': 'query', 'workspace': 'inbox', 'collection': 'Work'})
+            self.assertEqual(backend.selected, work)
+            # The open note is still listed under all notes, so it stays open.
+            backend.command({'action': 'query', 'workspace': 'inbox'})
+            self.assertEqual(backend.selected, work)
+            backend.command({'action': 'select', 'id': home})
+            # A page coming back asks for its remembered note.
+            backend.command({'action': 'query', 'workspace': 'inbox', 'select': work})
+            self.assertEqual(backend.selected, work)
+            # Not listed: the first note opens instead.
+            backend.command({'action': 'query', 'workspace': 'inbox', 'collection': 'Home', 'select': work})
+            self.assertEqual(backend.selected, home)
+        finally:
+            backend.shutdown()
+
 
 if __name__ == '__main__': unittest.main()
